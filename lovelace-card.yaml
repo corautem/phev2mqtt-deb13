@@ -1,0 +1,43 @@
+type: vertical-stack
+cards:
+  - type: markdown
+    content: "## 🚗 PHEV Gateway"
+
+  - type: entities
+    title: WiFi Connection
+    icon: mdi:wifi
+    entities:
+      - entity: sensor.phev_wifi_status
+        name: Interface Status
+        icon: mdi:lan-connect
+      - entity: sensor.phev_wifi_ssid
+        name: Connected SSID
+        icon: mdi:wifi-settings
+      - entity: sensor.phev_wifi_ip
+        name: IP Address
+        icon: mdi:ip-network
+      - entity: sensor.phev_wifi_signal
+        name: Signal Strength
+        icon: mdi:signal
+
+  - type: horizontal-stack
+    cards:
+      - type: button
+        name: Reconnect
+        icon: mdi:wifi-refresh
+        tap_action:
+          action: call-service
+          service: mqtt.publish
+          service_data:
+            topic: phev2mqtt/reconnect/set
+            payload: reconnect
+        icon_height: 40px
+
+      - type: button
+        entity: switch.phev_wifi
+        name: WiFi Enable
+        icon: mdi:wifi
+        tap_action:
+          action: toggle
+        show_state: true
+        icon_height: 40px
