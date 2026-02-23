@@ -24,6 +24,11 @@ A complete guide for migrating [buxtronix/phev2mqtt](https://github.com/buxtroni
 - Mitsubishi Outlander PHEV
 - Home Assistant with Mosquitto MQTT broker
 
+## Screenshots
+
+![PHEV Dashboard](./screenshots/dashboard-mobile.png)
+![PHEV Gateway Card](./screenshots/gateway-card.png)
+
 ## Files
 
 | File | Description |
