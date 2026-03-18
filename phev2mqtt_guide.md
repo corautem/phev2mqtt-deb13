@@ -1015,7 +1015,46 @@ apt install -y isc-dhcp-client
 dhclient YOUR_WIFI_INTERFACE_NAME
 ```
 
-### HA sensors show "Unknown"
+### WiFi interface disappears after kernel update
+**Symptom:** After an automatic kernel update the WiFi interface (`wlx...`) disappears completely from `ip link show`, wpa_supplicant fails to start, and dmesg shows:
+```
+rtw_8822bu: firmware: failed to load rtw88/rtw8822b_fw.bin (-2)
+rtw_8822bu: failed to load firmware
+```
+**Cause:** When the kernel updates from 6.1 to 6.12+, the old out-of-tree `88x2bu` DKMS driver is no longer loaded. Kernel 6.12+ includes a native in-kernel `rtw88_8822bu` driver, but it requires a firmware file that is not installed by default.
+
+**Fix:**
+
+1. Enable non-free-firmware repository if not already done:
+```bash
+nano /etc/apt/sources.list.d/debian.sources
+```
+Add `contrib non-free non-free-firmware` to both `Components:` lines.
+
+2. Install the firmware package:
+```bash
+apt update
+apt install -y firmware-realtek
+```
+
+3. Reload the driver:
+```bash
+modprobe -r rtw88_8822bu
+modprobe rtw88_8822bu
+ip link show
+```
+The interface should reappear.
+
+4. Make it permanent across reboots:
+```bash
+echo "rtw88_8822bu" >> /etc/modules
+update-initramfs -u
+reboot
+```
+
+After this you are running the native in-kernel driver which is better long term — no more DKMS rebuilds needed on future kernel updates, just the firmware package which is maintained automatically by apt.
+
+
 **Symptom:** PHEV WiFi sensors in Home Assistant show Unknown state.
 **Cause:** The status script hasn't run yet or mosquitto-clients is not installed.
 **Fix:**
