@@ -20,10 +20,21 @@ cards:
         name: Signal Strength
         icon: mdi:signal
 
+  - type: entities
+    title: phev2mqtt Service
+    icon: mdi:cog
+    entities:
+      - entity: sensor.phev_service_state
+        name: Service State
+        icon: mdi:cog-sync
+      - entity: sensor.phev_service_uptime_friendly
+        name: Uptime
+        icon: mdi:timer
+
   - type: horizontal-stack
     cards:
       - type: button
-        name: Reconnect
+        name: Reconnect WiFi
         icon: mdi:wifi-refresh
         tap_action:
           action: call-service
@@ -40,4 +51,16 @@ cards:
         tap_action:
           action: toggle
         show_state: true
+        icon_height: 40px
+
+      # NEW
+      - type: button
+        name: Restart Service
+        icon: mdi:restart
+        tap_action:
+          action: call-service
+          service: mqtt.publish
+          service_data:
+            topic: phev2mqtt/service/restart
+            payload: restart
         icon_height: 40px

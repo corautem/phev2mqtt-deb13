@@ -1,0 +1,17 @@
+
+- sensor:
+    - name: "PHEV Service Uptime Friendly"
+      unique_id: phev_service_uptime_friendly
+      icon: mdi:timer
+      state: >
+        {% set s = states('sensor.phev_service_uptime') | int(0) %}
+        {% set d = (s // 86400) %}
+        {% set h = (s % 86400) // 3600 %}
+        {% set m = (s % 3600) // 60 %}
+        {% if d > 0 %}
+          {{ d }}d {{ h }}h {{ m }}m
+        {% elif h > 0 %}
+          {{ h }}h {{ m }}m
+        {% else %}
+          {{ m }}m
+        {% endif %}

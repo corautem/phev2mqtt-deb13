@@ -1,0 +1,49 @@
+mqtt:
+  button:
+    - name: "PHEV Reconnect"
+      command_topic: "phev2mqtt/reconnect/set"
+      payload_press: "reconnect"
+      unique_id: phev_reconnect_button
+
+    # NEW
+    - name: "PHEV Restart Service"
+      command_topic: "phev2mqtt/service/restart"
+      payload_press: "restart"
+      unique_id: phev_service_restart_button
+      icon: mdi:restart
+
+  switch:
+    - name: "PHEV WiFi"
+      command_topic: "phev2mqtt/wifi/set"
+      state_topic: "phev2mqtt/wifi/enabled"
+      payload_on: "ON"
+      payload_off: "OFF"
+      state_on: "ON"
+      state_off: "OFF"
+      unique_id: phev_wifi_switch
+
+  sensor:
+    - name: "PHEV WiFi IP"
+      state_topic: "phev2mqtt/wifi/ip"
+      unique_id: phev_wifi_ip
+    - name: "PHEV WiFi Signal"
+      state_topic: "phev2mqtt/wifi/signal"
+      unit_of_measurement: "dBm"
+      unique_id: phev_wifi_signal
+    - name: "PHEV WiFi SSID"
+      state_topic: "phev2mqtt/wifi/ssid"
+      unique_id: phev_wifi_ssid
+    - name: "PHEV WiFi Status"
+      state_topic: "phev2mqtt/wifi/status"
+      unique_id: phev_wifi_status
+
+    # NEW
+    - name: "PHEV Service State"
+      state_topic: "phev2mqtt/service/state"
+      unique_id: phev_service_state
+      icon: mdi:cog-sync
+    - name: "PHEV Service Uptime"
+      state_topic: "phev2mqtt/service/uptime"
+      unique_id: phev_service_uptime
+      unit_of_measurement: "s"
+      icon: mdi:timer
