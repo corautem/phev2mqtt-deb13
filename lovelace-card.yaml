@@ -30,6 +30,9 @@ cards:
       - entity: sensor.phev_service_uptime_friendly
         name: Uptime
         icon: mdi:timer
+      - entity: sensor.phev_watchdog_last_action
+        name: Watchdog Last Action
+        icon: mdi:robot-outline
 
   - type: horizontal-stack
     cards:

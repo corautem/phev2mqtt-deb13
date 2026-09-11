@@ -61,3 +61,9 @@ mqtt:
       unique_id: phev_service_uptime
       unit_of_measurement: "s"
       icon: mdi:timer
+
+    # NEW
+    - name: "PHEV Watchdog Last Action"
+      state_topic: "phev2mqtt/watchdog/action"
+      unique_id: phev_watchdog_action
+      icon: mdi:robot-outline

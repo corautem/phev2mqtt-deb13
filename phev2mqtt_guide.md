@@ -26,6 +26,7 @@ This guide documents the full process of migrating the [buxtronix/phev2mqtt](htt
 16. [How to Update phev2mqtt](#16-how-to-update-phev2mqtt)
 17. [Useful Diagnostic Commands](#17-useful-diagnostic-commands)
 18. [Known Issues and Fixes](#18-known-issues-and-fixes)
+19. [Self-Healing Watchdog](#19-self-healing-watchdog)
 
 ---
 
@@ -247,6 +248,43 @@ iw dev YOUR_WIFI_INTERFACE_NAME get power_save
 
 > **Driver log messages explained:** After installing the driver you will see messages like `Dump efuse in suspend`, `Invalid rate 0x0`, `power state unchange` in dmesg. These are known quirks of this driver and are harmless. The important line confirming success is:
 > `rtw_ndev_init(wlan0) mac_addr=xx:xx:xx:xx:xx:xx`
+
+### Disable USB autosuspend (a second, separate power-save layer)
+
+The `power_save off` setting above only disables the adapter's **802.11 Link Power Save** — a WiFi-protocol-level sleep mode. Linux's **USB autosuspend** is a completely separate mechanism that can independently suspend the USB WiFi dongle itself after a period of inactivity, regardless of the 802.11 setting. Leaving it enabled is a second possible cause of the radio going unresponsive (see [Known Issues](#18-known-issues-and-fixes)).
+
+Check the current setting:
+
+```bash
+cat /sys/module/usbcore/parameters/autosuspend
+# A value other than -1 (commonly 2) means autosuspend is enabled
+```
+
+Disable it permanently via a kernel boot parameter:
+
+```bash
+nano /etc/default/grub
+```
+
+Add `usbcore.autosuspend=-1` to the `GRUB_CMDLINE_LINUX_DEFAULT` line, e.g.:
+
+```
+GRUB_CMDLINE_LINUX_DEFAULT="quiet usbcore.autosuspend=-1"
+```
+
+```bash
+update-grub
+reboot
+```
+
+Verify after reboot:
+
+```bash
+cat /sys/module/usbcore/parameters/autosuspend
+# Expected: -1
+```
+
+> **Why disable it globally instead of per-device?** A per-device fix requires a udev rule matching the dongle's exact vendor/product ID. On a single-purpose headless VM with no battery to save power for, disabling USB autosuspend system-wide is simpler and has no meaningful downside.
 
 ---
 
@@ -1278,19 +1316,26 @@ rtw_8822bu 5-1:1.0: firmware failed to leave lps state
 rtw_8822bu 5-1:1.0: failed to send h2c command
 ```
 
-**Fix:** Try the buttons in the Home Assistant PHEV Gateway card (see Section 15) in this order:
+**Fix:** Try the buttons in the Home Assistant PHEV Gateway card (see Section 15) in this order — or install the [Self-Healing Watchdog](#19-self-healing-watchdog) (Section 19) to have this done automatically:
 
 1. **Restart Service** — forces a clean TCP reconnect to the car. Fixes it when the hang is in phev2mqtt itself (a stale TCP session) while the WiFi radio is fine.
 2. **WiFi Driver Reload** — reloads the WiFi driver module. Fixes it when the radio firmware itself is stuck in LPS and won't wake up for TX, which a phev2mqtt-level restart can't reach. Briefly drops and automatically re-establishes the WiFi connection; no settings are changed.
 3. **Reboot VM** — full VM reboot, forcing a complete USB re-enumeration. Use if the driver reload doesn't clear it either.
 
-To prevent the LPS errors from occurring in the first place, ensure the `wifi-powersave-off.service` is active and applied correctly:
+To prevent the LPS errors from occurring in the first place, make sure both power-save layers are disabled:
 
 ```bash
+# 802.11 Link Power Save (see Section 5)
 systemctl status wifi-powersave-off.service
 iw dev YOUR_WIFI_INTERFACE_NAME get power_save
 # Expected: Power save: off
+
+# USB autosuspend (a separate layer, see Section 5)
+cat /sys/module/usbcore/parameters/autosuspend
+# Expected: -1
 ```
+
+Both settings address different layers of the same symptom, and it's worth confirming both are correctly applied — a stuck adapter has historically recurred even with 802.11 power save disabled, which is why USB autosuspend is worth ruling out too.
 
 > **Note:** Do not use the WiFi Reconnect button for this problem — that restarts the WiFi association but leaves the phev2mqtt process and its stale TCP session untouched, and doesn't reload the driver either. It only helps when the WiFi association itself (not the TCP session or the radio firmware) has dropped.
 
@@ -1445,3 +1490,158 @@ apt install -y mosquitto-clients
 chmod +x /usr/local/bin/phev-wifi-status.sh
 /usr/local/bin/phev-wifi-status.sh
 ```
+
+---
+
+## 19. Self-Healing Watchdog
+
+> **Optional but recommended.** Automates the manual escalation described in [Known Issues](#18-known-issues-and-fixes) for "Heating / AC commands not responding" — Restart Service → WiFi Driver Reload → Reboot VM — so it happens without you noticing the problem first. Requires the `phev-hardreset.sh` script from Section 14 to already be installed.
+
+### How it works
+
+Every 4 minutes, a timer checks the kernel log for the exact stuck-radio signature already identified in Section 18 (`firmware failed to leave lps state` / `failed to send h2c command`), looking only at log lines that appeared since its last check (so nothing is double-counted or missed at the boundary between runs). If the signature is present, it escalates based on a counter that persists across ticks but resets on recovery:
+
+- **1st detection** → restarts phev2mqtt (equivalent to the Restart Service button)
+- **2nd consecutive detection** (the restart didn't help) → runs `phev-hardreset.sh` (equivalent to WiFi Driver Reload)
+- **3rd+ consecutive detection** (the driver reload didn't help either) → reboots the VM — but only if it hasn't already auto-rebooted in the last 2 hours, to avoid a reboot loop if something is persistently broken. If that cooldown is active, it logs and publishes a "needs attention" status instead of rebooting again.
+
+Every action — including recovering back to normal and the "needs attention" case — is logged with `logger -t phev-watchdog` (view with `journalctl -t phev-watchdog`) and published to MQTT, so you can see what it did after the fact rather than it acting silently.
+
+### Watchdog script
+
+```bash
+nano /usr/local/bin/phev-watchdog.sh
+```
+
+```bash
+#!/bin/bash
+
+MQTT_HOST="HA_IP_ADDRESS"
+MQTT_USER="YOUR_MQTT_USER"
+MQTT_PASS="YOUR_MQTT_PASS"
+
+RUN_DIR="/run/phev-watchdog"
+STATE_DIR="/var/lib/phev-watchdog"
+mkdir -p "$RUN_DIR" "$STATE_DIR"
+
+COUNT_FILE="$RUN_DIR/count"
+LAST_CHECK_FILE="$RUN_DIR/last_check"
+LAST_REBOOT_FILE="$STATE_DIR/last_reboot"
+
+COUNT=$(cat "$COUNT_FILE" 2>/dev/null || echo 0)
+SINCE=$(cat "$LAST_CHECK_FILE" 2>/dev/null || date -d '5 minutes ago' '+%Y-%m-%d %H:%M:%S')
+date '+%Y-%m-%d %H:%M:%S' > "$LAST_CHECK_FILE"
+
+STUCK=0
+if journalctl -k --since "$SINCE" 2>/dev/null | grep -qE "failed to leave lps state|failed to send h2c command"; then
+  STUCK=1
+fi
+
+if [ "$STUCK" = "1" ]; then
+  COUNT=$((COUNT + 1))
+  echo "$COUNT" > "$COUNT_FILE"
+
+  if [ "$COUNT" -eq 1 ]; then
+    logger -t phev-watchdog "Stuck radio detected, restarting phev2mqtt service"
+    mosquitto_pub -h $MQTT_HOST -u $MQTT_USER -P $MQTT_PASS -t "phev2mqtt/watchdog/action" -m "restart_service"
+    systemctl restart phev2mqtt
+
+  elif [ "$COUNT" -eq 2 ]; then
+    logger -t phev-watchdog "Stuck radio persists after service restart, reloading WiFi driver"
+    mosquitto_pub -h $MQTT_HOST -u $MQTT_USER -P $MQTT_PASS -t "phev2mqtt/watchdog/action" -m "driver_reload"
+    /usr/local/bin/phev-hardreset.sh
+
+  else
+    LAST_REBOOT=$(cat "$LAST_REBOOT_FILE" 2>/dev/null || echo 0)
+    NOW=$(date +%s)
+    if [ $((NOW - LAST_REBOOT)) -gt 7200 ]; then
+      logger -t phev-watchdog "Stuck radio persists after driver reload, rebooting VM"
+      mosquitto_pub -h $MQTT_HOST -u $MQTT_USER -P $MQTT_PASS -t "phev2mqtt/watchdog/action" -m "reboot"
+      echo "$NOW" > "$LAST_REBOOT_FILE"
+      systemctl reboot
+    else
+      logger -t phev-watchdog "Stuck radio persists but rebooted within the last 2 hours already, holding off to avoid a loop"
+      mosquitto_pub -h $MQTT_HOST -u $MQTT_USER -P $MQTT_PASS -t "phev2mqtt/watchdog/action" -m "stuck_needs_attention"
+    fi
+  fi
+else
+  if [ "$COUNT" != "0" ]; then
+    logger -t phev-watchdog "Recovered"
+    mosquitto_pub -h $MQTT_HOST -u $MQTT_USER -P $MQTT_PASS -t "phev2mqtt/watchdog/action" -m "recovered"
+  fi
+  echo 0 > "$COUNT_FILE"
+fi
+```
+
+```bash
+chmod +x /usr/local/bin/phev-watchdog.sh
+```
+
+### Watchdog systemd service and timer
+
+```bash
+nano /etc/systemd/system/phev-watchdog.service
+```
+
+```ini
+[Unit]
+Description=Check for a stuck PHEV WiFi radio and self-heal
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/phev-watchdog.sh
+```
+
+```bash
+nano /etc/systemd/system/phev-watchdog.timer
+```
+
+```ini
+[Unit]
+Description=Run the PHEV watchdog every 4 minutes
+
+[Timer]
+OnBootSec=4min
+OnUnitActiveSec=4min
+
+[Install]
+WantedBy=timers.target
+```
+
+```bash
+systemctl daemon-reload
+systemctl enable phev-watchdog.timer
+systemctl start phev-watchdog.timer
+```
+
+### Add a Home Assistant sensor for watchdog activity
+
+Add to the `mqtt: sensor:` list in `configuration.yaml`:
+
+```yaml
+    - name: "PHEV Watchdog Last Action"
+      state_topic: "phev2mqtt/watchdog/action"
+      unique_id: phev_watchdog_action
+      icon: mdi:robot-outline
+```
+
+Add it to the "phev2mqtt Service" entities card in your Lovelace dashboard (Section 15):
+
+```yaml
+      - entity: sensor.phev_watchdog_last_action
+        name: Watchdog Last Action
+        icon: mdi:robot-outline
+```
+
+Restart Home Assistant (or reload the MQTT integration) after editing `configuration.yaml`.
+
+### Verifying it works
+
+```bash
+systemctl status phev-watchdog.timer
+journalctl -t phev-watchdog
+```
+
+During normal operation you should see nothing alarming — the script runs silently every 4 minutes and only logs when it detects the stuck-radio signature or recovers from one. There's no safe way to manually trigger the actual LPS bug to test the escalation end-to-end; the first real confirmation will be the next time it happens naturally. When it does, `journalctl -t phev-watchdog` and the `sensor.phev_watchdog_last_action` entity will show which step it took, and heating/AC should respond again without you having touched a button.
+
+> **Tuning:** if the watchdog escalates more aggressively than you'd like, or the 2-hour reboot cooldown is too short/long for how often this happens on your setup, the counter thresholds and cooldown value in the script can be adjusted directly.
