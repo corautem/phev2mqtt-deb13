@@ -1303,6 +1303,18 @@ dkms status
 **Cause:** Known quirks of the RTL88x2BU out-of-tree driver.
 **Fix:** These are harmless. The important line is `module init ret=0` and the interface appearing in `ip link show`.
 
+### "Failed to query local AF_VSOCK CID" on systemctl commands
+
+**Symptom:** Running `systemctl daemon-reload`, `enable`, `start`, or similar prints a line like:
+
+```
+systemd-ssh-generator[992]: Failed to query local AF_VSOCK CID: Cannot assign requested address
+```
+
+**Cause:** Newer systemd versions include a generator that sets up SSH access over AF_VSOCK (a VM-to-host socket some hypervisor tools use for console/SSH access without networking). This is a standard Proxmox VM with no vsock device attached, so the generator fails to query one.
+
+**Fix:** None needed — this is not an error and is unrelated to whatever systemctl command you were actually running. It doesn't affect phev2mqtt, WiFi, or any service in this guide. Safe to ignore.
+
 ### Heating / AC commands not responding despite car being connected
 
 **Symptom:** Car is connected and state sensors (locks, doors, battery) update normally in Home Assistant, but commands like windscreen heat or AC have no effect. Restarting the phev2mqtt service fixes it.
