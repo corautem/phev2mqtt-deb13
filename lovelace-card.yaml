@@ -69,8 +69,8 @@ cards:
   - type: horizontal-stack
     cards:
       - type: button
-        name: Hard WiFi Reset
-        icon: mdi:wifi-alert
+        name: WiFi Driver Reload
+        icon: mdi:wifi-cog
         tap_action:
           action: call-service
           service: mqtt.publish
@@ -78,7 +78,7 @@ cards:
             topic: phev2mqtt/hardreset/set
             payload: hardreset
           confirmation:
-            text: "Reload the WiFi driver? Takes about 20 seconds."
+            text: "Reloads the WiFi driver and automatically reconnects (~20s). Does not change any WiFi settings."
         icon_height: 40px
 
       - type: button

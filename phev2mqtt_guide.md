@@ -673,9 +673,9 @@ esac
 chmod +x /usr/local/bin/phev-wifi-control.sh
 ```
 
-### Hard WiFi reset script — reloads the WiFi driver
+### WiFi driver reload script
 
-Sometimes the USB WiFi adapter's firmware gets stuck in **Link Power Save (LPS)** mode (see [Known Issues](#18-known-issues-and-fixes)) badly enough that even restarting `wpa_supplicant` and phev2mqtt doesn't recover it — the radio itself is wedged. Reloading the kernel driver module resets the radio firmware without rebooting the whole VM, and is much faster (~20s) than a full reboot.
+Sometimes the USB WiFi adapter's firmware gets stuck in **Link Power Save (LPS)** mode (see [Known Issues](#18-known-issues-and-fixes)) badly enough that even restarting `wpa_supplicant` and phev2mqtt doesn't recover it — the radio itself is wedged. Reloading the kernel driver module resets the radio firmware without rebooting the whole VM, and is much faster (~20s) than a full reboot. This is not a "reset" in the router sense — no WiFi settings are erased or changed, it just briefly drops and automatically re-establishes the same connection using the existing saved credentials.
 
 ```bash
 nano /usr/local/bin/phev-hardreset.sh
@@ -768,7 +768,7 @@ chmod +x /usr/local/bin/phev-mqtt-listener.sh
 
 > **Why a dedicated restart command?** The WiFi reconnect button restarts `wpa_supplicant` and the network connection to the car. However, if the phev2mqtt process itself has a stale TCP session to the car (connection appears up but commands like heating are silently ignored), restarting WiFi alone will not fix it. The `restart` command targets the phev2mqtt process directly, which forces a clean TCP reconnect without disrupting the WiFi association.
 >
-> **Escalation order:** try **Restart Service** first (fixes a stale phev2mqtt TCP session), then **Hard WiFi Reset** (fixes a stuck WiFi radio/firmware that a service restart can't reach), then **Reboot VM** as the last resort (forces a full USB re-enumeration). The listener service itself runs as root via systemd, so `systemctl reboot` and `modprobe` need no extra sudoers configuration.
+> **Escalation order:** try **Restart Service** first (fixes a stale phev2mqtt TCP session), then **WiFi Driver Reload** (fixes a stuck WiFi radio/firmware that a service restart can't reach — it briefly drops and automatically re-establishes the connection, no settings are changed or lost), then **Reboot VM** as the last resort (forces a full USB re-enumeration). The listener service itself runs as root via systemd, so `systemctl reboot` and `modprobe` need no extra sudoers configuration.
 
 ### Listener systemd service
 
@@ -854,11 +854,11 @@ mqtt:
       unique_id: phev_service_restart_button
       icon: mdi:restart
 
-    - name: "PHEV Hard WiFi Reset"
+    - name: "PHEV WiFi Driver Reload"
       command_topic: "phev2mqtt/hardreset/set"
       payload_press: "hardreset"
       unique_id: phev_hardreset_button
-      icon: mdi:wifi-alert
+      icon: mdi:wifi-cog
 
     - name: "PHEV Reboot VM"
       command_topic: "phev2mqtt/reboot/set"
@@ -1002,8 +1002,8 @@ cards:
   - type: horizontal-stack
     cards:
       - type: button
-        name: Hard WiFi Reset
-        icon: mdi:wifi-alert
+        name: WiFi Driver Reload
+        icon: mdi:wifi-cog
         tap_action:
           action: call-service
           service: mqtt.publish
@@ -1011,7 +1011,7 @@ cards:
             topic: phev2mqtt/hardreset/set
             payload: hardreset
           confirmation:
-            text: "Reload the WiFi driver? Takes about 20 seconds."
+            text: "Reloads the WiFi driver and automatically reconnects (~20s). Does not change any WiFi settings."
         icon_height: 40px
 
       - type: button
@@ -1032,8 +1032,8 @@ cards:
 > - **Reconnect WiFi** — use when the WiFi connection to the car has dropped (signal lost, car moved out of range and back)
 > - **WiFi Enable/Disable** — use when you need to temporarily connect another device (phone, laptop) directly to the car's hotspot
 > - **Restart Service** — use when the car is connected and WiFi sensors show healthy, but commands like heating or AC are not responding. This restarts the phev2mqtt process and forces a clean TCP reconnect to the car without touching the WiFi
-> - **Hard WiFi Reset** — use when Restart Service doesn't bring commands back. Reloads the WiFi driver to clear a radio stuck in Link Power Save mode, without rebooting the VM
-> - **Reboot VM** — last resort, when Hard WiFi Reset doesn't help either. Full VM reboot, forces a complete USB re-enumeration
+> - **WiFi Driver Reload** — use when Restart Service doesn't bring commands back. Reloads the WiFi driver to clear a radio stuck in Link Power Save mode, without rebooting the VM. This does not erase or change any saved WiFi settings — it briefly drops and automatically re-establishes the same connection to the car
+> - **Reboot VM** — last resort, when WiFi Driver Reload doesn't help either. Full VM reboot, forces a complete USB re-enumeration
 
 ---
 
@@ -1281,7 +1281,7 @@ rtw_8822bu 5-1:1.0: failed to send h2c command
 **Fix:** Try the buttons in the Home Assistant PHEV Gateway card (see Section 15) in this order:
 
 1. **Restart Service** — forces a clean TCP reconnect to the car. Fixes it when the hang is in phev2mqtt itself (a stale TCP session) while the WiFi radio is fine.
-2. **Hard WiFi Reset** — reloads the WiFi driver module. Fixes it when the radio firmware itself is stuck in LPS and won't wake up for TX, which a phev2mqtt-level restart can't reach.
+2. **WiFi Driver Reload** — reloads the WiFi driver module. Fixes it when the radio firmware itself is stuck in LPS and won't wake up for TX, which a phev2mqtt-level restart can't reach. Briefly drops and automatically re-establishes the WiFi connection; no settings are changed.
 3. **Reboot VM** — full VM reboot, forcing a complete USB re-enumeration. Use if the driver reload doesn't clear it either.
 
 To prevent the LPS errors from occurring in the first place, ensure the `wifi-powersave-off.service` is active and applied correctly:
