@@ -64,3 +64,32 @@ cards:
             topic: phev2mqtt/service/restart
             payload: restart
         icon_height: 40px
+
+  # NEW
+  - type: horizontal-stack
+    cards:
+      - type: button
+        name: Hard WiFi Reset
+        icon: mdi:wifi-alert
+        tap_action:
+          action: call-service
+          service: mqtt.publish
+          service_data:
+            topic: phev2mqtt/hardreset/set
+            payload: hardreset
+          confirmation:
+            text: "Reload the WiFi driver? Takes about 20 seconds."
+        icon_height: 40px
+
+      - type: button
+        name: Reboot VM
+        icon: mdi:restart-alert
+        tap_action:
+          action: call-service
+          service: mqtt.publish
+          service_data:
+            topic: phev2mqtt/reboot/set
+            payload: reboot
+          confirmation:
+            text: "Reboot the whole PHEV gateway VM? Takes about a minute."
+        icon_height: 40px

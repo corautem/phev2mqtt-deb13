@@ -12,6 +12,20 @@ mqtt:
       unique_id: phev_service_restart_button
       icon: mdi:restart
 
+    # NEW
+    - name: "PHEV Hard WiFi Reset"
+      command_topic: "phev2mqtt/hardreset/set"
+      payload_press: "hardreset"
+      unique_id: phev_hardreset_button
+      icon: mdi:wifi-alert
+
+    # NEW
+    - name: "PHEV Reboot VM"
+      command_topic: "phev2mqtt/reboot/set"
+      payload_press: "reboot"
+      unique_id: phev_reboot_button
+      icon: mdi:restart-alert
+
   switch:
     - name: "PHEV WiFi"
       command_topic: "phev2mqtt/wifi/set"
