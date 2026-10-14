@@ -1886,6 +1886,8 @@ systemctl restart phev2mqtt
 
 The settings appear in the **Diagnostic** section of the **PHEV &lt;VIN&gt;** device, named after their group, for example **Phev Lights: Headlights ON when exiting Vehicle** or **Phev Door locks: Automatic Unlock**. Each one shows its current option; its attributes list the options your car offers. **Phev Vehicle Settings Changes** shows whether the car currently accepts changes (`allowed` or `refused`).
 
+The car sends its settings a few at a time, carrying on through its list while phev2mqtt is connected, so the list fills in over the first minutes, or longer. Once a setting has appeared it stays, and keeps its last value across restarts of phev2mqtt and Home Assistant.
+
 The theft-alarm settings are never shown, as in Mitsubishi's own app.
 
 ### Switch them off
