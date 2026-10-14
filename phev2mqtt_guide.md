@@ -28,6 +28,7 @@ This guide documents the full process of migrating the [buxtronix/phev2mqtt](htt
 18. [Known Issues and Fixes](#18-known-issues-and-fixes)
 19. [Self-Healing Watchdog](#19-self-healing-watchdog)
 20. [Optional Extra Sensors](#20-optional-extra-sensors)
+21. [Vehicle Settings (Read-Only)](#21-vehicle-settings-read-only)
 
 ---
 
@@ -1853,3 +1854,47 @@ phev2mqtt then removes these entities from Home Assistant. A rollback ([Section 
 ### Good to know
 
 - **Charger Connected with a smart charger:** while a smart charger holds off outside its charge slots, the car itself reports no charger, so Charger Connected reads unplugged even with the cable in. Your charger's own Home Assistant integration shows whether the cable is in.
+
+---
+
+## 21. Vehicle Settings (Read-Only)
+
+> **Optional.** Needs a [corautem/phev2mqtt](https://github.com/corautem/phev2mqtt) build from October 2026 or later, installed with [Section 16](#16-how-to-update-and-roll-back-phev2mqtt).
+
+The car's own customisable functions, the ones Mitsubishi's app lists under "Vehicle settings", can be shown in Home Assistant: lights, locks and unlock mode, lock beeps and horn answerback, wipers, turn signals, power windows and A/C behaviour. The car reports them itself; which ones appear depends on how your car is equipped. The decoding is ported from [phev-remote-plus](https://github.com/Anwo91/phev-remote-plus), which worked it out from Mitsubishi's app.
+
+For now they are **read-only**: phev2mqtt shows each setting and its current value, but cannot change it yet. Compare them with your car before changes are switched on in a later version.
+
+### Switch them on
+
+Add a line to the drop-in file from [Section 20](#20-optional-extra-sensors) (create it as shown there if you don't have it):
+
+```bash
+nano /etc/systemd/system/phev2mqtt.service.d/options.conf
+```
+
+```ini
+[Service]
+Environment=EXTRA_SENSORS=true
+Environment=VEHICLE_SETTINGS=read
+```
+
+```bash
+systemctl daemon-reload
+systemctl restart phev2mqtt
+```
+
+The settings appear in the **Diagnostic** section of the **PHEV &lt;VIN&gt;** device, named after their group, for example **Phev Lights: Headlights ON when exiting Vehicle** or **Phev Door locks: Automatic Unlock**. Each one shows its current option; its attributes list the options your car offers. **Phev Vehicle Settings Changes** shows whether the car currently accepts changes (`allowed` or `refused`).
+
+The theft-alarm settings are never shown, as in Mitsubishi's own app.
+
+### Switch them off
+
+Set `VEHICLE_SETTINGS=off` in `options.conf` (or delete the line), then:
+
+```bash
+systemctl daemon-reload
+systemctl restart phev2mqtt
+```
+
+phev2mqtt then removes these entities from Home Assistant. A rollback ([Section 16](#16-how-to-update-and-roll-back-phev2mqtt)) removes them too.

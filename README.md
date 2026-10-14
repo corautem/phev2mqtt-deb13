@@ -15,6 +15,7 @@ A complete guide for migrating [buxtronix/phev2mqtt](https://github.com/buxtroni
 - WiFi status sensors, reconnect button and WiFi enable/disable switch in Home Assistant
 - Updating phev2mqtt with every build kept, and rolling back in one step (script or Home Assistant button)
 - Optional extra car sensors: power switch, security alarm, charge type, the car's own charge and climate timers
+- The car's own settings (lights, locks, wipers, A/C behaviour) shown in Home Assistant
 - Useful diagnostic commands
 - Known issues and fixes
 
