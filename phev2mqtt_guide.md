@@ -1810,6 +1810,8 @@ phev2mqtt can publish 14 more Home Assistant entities, decoded from data the car
 | Registration Standby | The car is in registration mode (diagnostic) |
 | Car Clock | The car's own clock, which its charge and climate timers run on (diagnostic) |
 
+> **Car Clock and Last Alarm Event** read the car's clock in the VM's timezone. Set the VM to your local timezone ([Section 3](#3-first-steps-after-fresh-install)); on UTC they show an hour out during summer time.
+
 ### Switch them on
 
 Options are set with environment variables in a systemd drop-in file, not with command-line flags. An older build such as `phev2mqtt-stable` ignores the variables but would refuse to start with a flag it doesn't know, so a rollback keeps working.
@@ -1829,7 +1831,7 @@ systemctl daemon-reload
 systemctl restart phev2mqtt
 ```
 
-The entities appear on the **PHEV &lt;VIN&gt;** device (**Settings → Devices & Services → MQTT**) once the car sends its next full update, within a few minutes. **Add to dashboard** on the device page puts them on a dashboard.
+The entities appear on the **PHEV &lt;VIN&gt;** device (**Settings → Devices & Services → MQTT**) as soon as phev2mqtt reconnects to the car, and get their values a few seconds later. **Add to dashboard** on the device page puts them on a dashboard.
 
 ### Switch them off
 
@@ -1846,3 +1848,8 @@ phev2mqtt then removes these entities from Home Assistant. A rollback ([Section 
 
 - **Charger Connected** now reads connected while the car is plugged in inside its charge window but not charging. It used to read unplugged.
 - **Interior Lights** now reads on for every value the car uses for on.
+- **After a Home Assistant restart**, every phev2mqtt sensor gets its last known value again within a few seconds. The car sends most values only when they change, so they used to stay unknown until phev2mqtt restarted.
+
+### Good to know
+
+- **Charger Connected with a smart charger:** while a smart charger holds off outside its charge slots, the car itself reports no charger, so Charger Connected reads unplugged even with the cable in. Your charger's own Home Assistant integration shows whether the cable is in.
