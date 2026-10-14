@@ -23,10 +23,11 @@ This guide documents the full process of migrating the [buxtronix/phev2mqtt](htt
 13. [Home Assistant Integration](#13-home-assistant-integration)
 14. [WiFi Status Scripts and MQTT Sensors](#14-wifi-status-scripts-and-mqtt-sensors)
 15. [Home Assistant Lovelace Card](#15-home-assistant-lovelace-card)
-16. [How to Update phev2mqtt](#16-how-to-update-phev2mqtt)
+16. [How to Update and Roll Back phev2mqtt](#16-how-to-update-and-roll-back-phev2mqtt)
 17. [Useful Diagnostic Commands](#17-useful-diagnostic-commands)
 18. [Known Issues and Fixes](#18-known-issues-and-fixes)
 19. [Self-Healing Watchdog](#19-self-healing-watchdog)
+20. [Optional Extra Sensors](#20-optional-extra-sensors)
 
 ---
 
@@ -395,8 +396,10 @@ go version
 
 ### Clone and build phev2mqtt
 
+This guide uses [corautem/phev2mqtt](https://github.com/corautem/phev2mqtt), a fork of [buxtronix/phev2mqtt](https://github.com/buxtronix/phev2mqtt) with connection fixes and optional extra sensors (see [Section 20](#20-optional-extra-sensors)). With no options switched on it behaves like the original.
+
 ```bash
-git clone https://github.com/buxtronix/phev2mqtt.git
+git clone https://github.com/corautem/phev2mqtt.git
 cd phev2mqtt
 go build
 ```
@@ -410,6 +413,8 @@ cp phev2mqtt /usr/local/bin/
 chmod +x /usr/local/bin/phev2mqtt
 phev2mqtt -h
 ```
+
+> **Later updates** go through the install script in [Section 16](#16-how-to-update-and-roll-back-phev2mqtt), which keeps every build so you can switch back to an earlier one in seconds.
 
 ---
 
@@ -626,6 +631,8 @@ if [ -n "$SVC_UPTIME" ] && [ "$SVC_UPTIME" -gt 0 ] 2>/dev/null; then
 else
   SVC_UPTIME_SECS=0
 fi
+# Which build /usr/local/bin/phev2mqtt points to (see Section 16)
+SVC_BUILD=$(basename "$(readlink -f /usr/local/bin/phev2mqtt)")
 
 # Publish WiFi topics
 mosquitto_pub -h $MQTT_HOST -u $MQTT_USER -P $MQTT_PASS -t "phev2mqtt/wifi/ip"      -m "${IP:-unavailable}"
@@ -637,6 +644,7 @@ mosquitto_pub -h $MQTT_HOST -u $MQTT_USER -P $MQTT_PASS -t "phev2mqtt/wifi/enabl
 # Publish service topics
 mosquitto_pub -h $MQTT_HOST -u $MQTT_USER -P $MQTT_PASS -t "phev2mqtt/service/state"  -m "$SVC_STATE"
 mosquitto_pub -h $MQTT_HOST -u $MQTT_USER -P $MQTT_PASS -t "phev2mqtt/service/uptime" -m "$SVC_UPTIME_SECS"
+mosquitto_pub -h $MQTT_HOST -u $MQTT_USER -P $MQTT_PASS -t "phev2mqtt/service/build"  -m "$SVC_BUILD"
 ```
 
 ```bash
@@ -778,7 +786,8 @@ mosquitto_sub -h $MQTT_HOST -u $MQTT_USER -P $MQTT_PASS \
   -t "phev2mqtt/wifi/set" \
   -t "phev2mqtt/service/restart" \
   -t "phev2mqtt/hardreset/set" \
-  -t "phev2mqtt/reboot/set" | while read line; do
+  -t "phev2mqtt/reboot/set" \
+  -t "phev2mqtt/rollback/set" | while read line; do
   case "$line" in
     reconnect) /usr/local/bin/phev-reconnect.sh ;;
     ON)  /usr/local/bin/phev-wifi-control.sh ON ;;
@@ -796,6 +805,7 @@ mosquitto_sub -h $MQTT_HOST -u $MQTT_USER -P $MQTT_PASS \
         -t "phev2mqtt/service/state" -m "rebooting"
       systemctl reboot
       ;;
+    rollback) /usr/local/bin/phev-rollback.sh ;;
   esac
 done
 ```
@@ -807,6 +817,8 @@ chmod +x /usr/local/bin/phev-mqtt-listener.sh
 > **Why a dedicated restart command?** The WiFi reconnect button restarts `wpa_supplicant` and the network connection to the car. However, if the phev2mqtt process itself has a stale TCP session to the car (connection appears up but commands like heating are silently ignored), restarting WiFi alone will not fix it. The `restart` command targets the phev2mqtt process directly, which forces a clean TCP reconnect without disrupting the WiFi association.
 >
 > **Escalation order:** try **Restart Service** first (fixes a stale phev2mqtt TCP session), then **WiFi Driver Reload** (fixes a stuck WiFi radio/firmware that a service restart can't reach — it briefly drops and automatically re-establishes the connection, no settings are changed or lost), then **Reboot VM** as the last resort (forces a full USB re-enumeration). The listener service itself runs as root via systemd, so `systemctl reboot` and `modprobe` need no extra sudoers configuration.
+>
+> **Rollback** is not part of the escalation: it switches phev2mqtt back to the build that ran before your updates, for when a new build misbehaves. It needs the scripts from [Section 16](#16-how-to-update-and-roll-back-phev2mqtt).
 
 ### Listener systemd service
 
@@ -904,6 +916,12 @@ mqtt:
       unique_id: phev_reboot_button
       icon: mdi:restart-alert
 
+    - name: "PHEV Rollback phev2mqtt"
+      command_topic: "phev2mqtt/rollback/set"
+      payload_press: "rollback"
+      unique_id: phev_rollback_button
+      icon: mdi:backup-restore
+
   switch:
     - name: "PHEV WiFi"
       command_topic: "phev2mqtt/wifi/set"
@@ -937,6 +955,10 @@ mqtt:
       unique_id: phev_service_uptime
       unit_of_measurement: "s"
       icon: mdi:timer
+    - name: "PHEV Running Build"
+      state_topic: "phev2mqtt/service/build"
+      unique_id: phev_service_build
+      icon: mdi:source-branch
 ```
 
 ### Add a friendly uptime template sensor to templates.yaml
@@ -1003,6 +1025,9 @@ cards:
       - entity: sensor.phev_service_uptime_friendly
         name: Uptime
         icon: mdi:timer
+      - entity: sensor.phev_running_build
+        name: Running Build
+        icon: mdi:source-branch
 
   - type: horizontal-stack
     cards:
@@ -1064,6 +1089,19 @@ cards:
           confirmation:
             text: "Reboot the whole PHEV gateway VM? Takes about a minute."
         icon_height: 40px
+
+      - type: button
+        name: Rollback
+        icon: mdi:backup-restore
+        tap_action:
+          action: call-service
+          service: mqtt.publish
+          service_data:
+            topic: phev2mqtt/rollback/set
+            payload: rollback
+          confirmation:
+            text: "Switch phev2mqtt back to the build that ran before your updates (phev2mqtt-stable)?"
+        icon_height: 40px
 ```
 
 > **When to use each button:**
@@ -1072,61 +1110,148 @@ cards:
 > - **Restart Service** — use when the car is connected and WiFi sensors show healthy, but commands like heating or AC are not responding. This restarts the phev2mqtt process and forces a clean TCP reconnect to the car without touching the WiFi
 > - **WiFi Driver Reload** — use when Restart Service doesn't bring commands back. Reloads the WiFi driver to clear a radio stuck in Link Power Save mode, without rebooting the VM. This does not erase or change any saved WiFi settings — it briefly drops and automatically re-establishes the same connection to the car
 > - **Reboot VM** — last resort, when WiFi Driver Reload doesn't help either. Full VM reboot, forces a complete USB re-enumeration
+> - **Rollback** — use when a newly installed phev2mqtt build misbehaves. Switches back to `phev2mqtt-stable` and removes the Home Assistant entities only the newer build creates (see [Section 16](#16-how-to-update-and-roll-back-phev2mqtt))
 
 ---
 
-## 16. How to Update phev2mqtt
+## 16. How to Update and Roll Back phev2mqtt
 
-When the [buxtronix/phev2mqtt](https://github.com/buxtronix/phev2mqtt) project receives updates on GitHub, follow these steps to update your installation:
+Every build is kept as its own file, `/usr/local/bin/phev2mqtt-<version>`, and `/usr/local/bin/phev2mqtt` becomes a link to the one in use. The build that was running before your first update with this section is kept as `phev2mqtt-stable`. Rolling back points the link at it again. The service file from Section 10 never changes.
 
-### Step 1: Stop the running service
+### Before every update
 
-```bash
-systemctl stop phev2mqtt
-```
+- Take a Proxmox snapshot of the VM.
+- Take a Home Assistant backup (**Settings → System → Backups**).
 
-### Step 2: Pull the latest code
+### Point your clone at the fork (once)
+
+If you cloned [buxtronix/phev2mqtt](https://github.com/buxtronix/phev2mqtt) before this guide switched to the fork:
 
 ```bash
 cd ~/phev2mqtt
-git pull
+git remote set-url origin https://github.com/corautem/phev2mqtt.git
+git fetch --tags origin
 ```
 
-### Step 3: Rebuild the binary
+### Install script
 
 ```bash
-go build
+nano /usr/local/bin/phev-install.sh
 ```
 
-### Step 4: Replace the installed binary
-
 ```bash
-cp phev2mqtt /usr/local/bin/
-chmod +x /usr/local/bin/phev2mqtt
+#!/bin/bash
+# Builds a phev2mqtt version, keeps it next to the earlier builds and
+# switches the service to it.
+# Usage: phev-install.sh [branch, tag or commit]   (default: master)
+set -euo pipefail
+export PATH="$PATH:/usr/local/go/bin"
+
+SRC="/root/phev2mqtt"   # where you cloned phev2mqtt in Section 8
+BIN="/usr/local/bin"
+REF="${1:-master}"
+
+cd "$SRC"
+git fetch --tags origin
+git checkout --quiet "$REF"
+# For a branch, bring it up to date with GitHub.
+if git show-ref --verify --quiet "refs/remotes/origin/$REF"; then
+  git merge --quiet --ff-only "origin/$REF"
+fi
+
+# Named after what you asked for plus the commit, e.g. master-1a2b3c4
+VER="$(echo "$REF" | tr '/' '-')-$(git rev-parse --short HEAD)"
+go build -o "$BIN/phev2mqtt-$VER.new" .
+mv "$BIN/phev2mqtt-$VER.new" "$BIN/phev2mqtt-$VER"
+
+# The first time, keep the build that is running today as phev2mqtt-stable.
+if [ -f "$BIN/phev2mqtt" ] && [ ! -L "$BIN/phev2mqtt" ]; then
+  if [ ! -e "$BIN/phev2mqtt-stable" ]; then
+    cp -p "$BIN/phev2mqtt" "$BIN/phev2mqtt-stable"
+  else
+    cp -p "$BIN/phev2mqtt" "$BIN/phev2mqtt-replaced-$(date +%Y%m%d-%H%M)"
+  fi
+fi
+
+ln -sfn "$BIN/phev2mqtt-$VER" "$BIN/phev2mqtt"
+systemctl restart phev2mqtt
+logger -t phev-install "phev2mqtt now runs phev2mqtt-$VER"
+echo "phev2mqtt now runs phev2mqtt-$VER (undo with phev-rollback.sh)"
 ```
 
-### Step 5: Restart the service
+```bash
+chmod +x /usr/local/bin/phev-install.sh
+```
+
+### Update
 
 ```bash
-systemctl start phev2mqtt
+phev-install.sh                       # latest master from GitHub
+phev-install.sh BRANCH_TAG_OR_COMMIT  # or a specific version
 journalctl -f -u phev2mqtt -o cat
 ```
 
-### Step 6: Verify
+You should see `%PHEV_TCP_CONNECTED%` in the logs. The **Running Build** sensor (Section 14) shows which build is in use, and `ls -l /usr/local/bin/phev2mqtt*` lists the installed builds.
 
-You should see `%PHEV_TCP_CONNECTED%` in the logs confirming the updated version is running.
+### Rollback script
 
-> **Tip:** If something breaks after an update, you can roll back using git:
->
-> ```bash
-> systemctl stop phev2mqtt
-> cd ~/phev2mqtt
-> git log --oneline   # find the previous commit hash
-> git checkout COMMIT_HASH
-> go build
-> cp phev2mqtt /usr/local/bin/
-> systemctl start phev2mqtt
-> ```
+```bash
+nano /usr/local/bin/phev-rollback.sh
+```
+
+```bash
+#!/bin/bash
+# Switches phev2mqtt back to phev2mqtt-stable, the build that ran before the
+# first update with phev-install.sh, and removes the Home Assistant entities
+# that only newer builds create.
+
+MQTT_HOST="HA_IP_ADDRESS"
+MQTT_USER="YOUR_MQTT_USER"
+MQTT_PASS="YOUR_MQTT_PASS"
+BIN="/usr/local/bin"
+
+if [ ! -L "$BIN/phev2mqtt" ] || [ ! -e "$BIN/phev2mqtt-stable" ]; then
+  echo "Nothing to roll back: phev2mqtt was never updated with phev-install.sh"
+  exit 1
+fi
+ACTIVE=$(readlink -f "$BIN/phev2mqtt")
+if [ "$ACTIVE" = "$(readlink -f "$BIN/phev2mqtt-stable")" ]; then
+  echo "Already running phev2mqtt-stable"
+  exit 0
+fi
+mosquitto_pub -h $MQTT_HOST -u $MQTT_USER -P $MQTT_PASS -t "phev2mqtt/service/state" -m "rolling back"
+
+# Stopped first, so it can't announce its entities again during the cleanup.
+systemctl stop phev2mqtt
+# Only the newer build knows which entities it added.
+"$ACTIVE" --config=/dev/null client mqtt-cleanup \
+  --mqtt_server "tcp://$MQTT_HOST:1883" --mqtt_username "$MQTT_USER" --mqtt_password "$MQTT_PASS" \
+  || echo "Entity cleanup failed or not supported by this build, continuing"
+ln -sfn "$BIN/phev2mqtt-stable" "$BIN/phev2mqtt"
+systemctl start phev2mqtt
+
+logger -t phev-rollback "Rolled back from $(basename "$ACTIVE") to phev2mqtt-stable"
+sleep 5
+/usr/local/bin/phev-wifi-status.sh
+echo "phev2mqtt now runs phev2mqtt-stable"
+```
+
+```bash
+chmod +x /usr/local/bin/phev-rollback.sh
+```
+
+### Roll back
+
+Run `phev-rollback.sh`, or press **Rollback** on the PHEV Gateway card (Sections 14 and 15). To go forward again, run `phev-install.sh` with the version you want, or point the link at a build that is already installed:
+
+```bash
+ln -sfn /usr/local/bin/phev2mqtt-VERSION /usr/local/bin/phev2mqtt
+systemctl restart phev2mqtt
+```
+
+> **Optional features stay switched on across a rollback.** They are set with environment variables ([Section 20](#20-optional-extra-sensors)), which `phev2mqtt-stable` ignores, so they come back when you install a newer build again. Section 20 explains how to switch them off.
+
+> **If the VM itself is in trouble**, restore the Proxmox snapshot you took before the update.
 
 ---
 
@@ -1318,6 +1443,8 @@ systemd-ssh-generator[992]: Failed to query local AF_VSOCK CID: Cannot assign re
 ### Heating / AC commands not responding despite car being connected
 
 **Symptom:** Car is connected and state sensors (locks, doors, battery) update normally in Home Assistant, but commands like windscreen heat or AC have no effect. Restarting the phev2mqtt service fixes it.
+
+> **Check this first:** the car only runs remote climate with its power switch **off**, and accepts the command without acting on it otherwise. With the extra sensors switched on ([Section 20](#20-optional-extra-sensors)), the **Power Switch** sensor shows this. If it reads `acc` or `on`, the cause is the car, not the connection.
 
 **Cause:** phev2mqtt maintains a persistent TCP connection to the car (`192.168.8.46:8080`). This connection can silently enter a hung state where the socket appears open but outgoing writes fail. State reads continue working because the car pushes register notifications to phev2mqtt regardless, but write commands (heating, AC, locks) require a functioning bidirectional TCP session.
 
@@ -1657,3 +1784,65 @@ journalctl -t phev-watchdog
 During normal operation you should see nothing alarming — the script runs silently every 4 minutes and only logs when it detects the stuck-radio signature or recovers from one. There's no safe way to manually trigger the actual LPS bug to test the escalation end-to-end; the first real confirmation will be the next time it happens naturally. When it does, `journalctl -t phev-watchdog` and the `sensor.phev_watchdog_last_action` entity will show which step it took, and heating/AC should respond again without you having touched a button.
 
 > **Tuning:** if the watchdog escalates more aggressively than you'd like, or the 2-hour reboot cooldown is too short/long for how often this happens on your setup, the counter thresholds and cooldown value in the script can be adjusted directly.
+
+---
+
+## 20. Optional Extra Sensors
+
+> **Optional.** Needs a [corautem/phev2mqtt](https://github.com/corautem/phev2mqtt) build from October 2026 or later, installed with [Section 16](#16-how-to-update-and-roll-back-phev2mqtt) so you can roll back.
+
+phev2mqtt can publish 14 more Home Assistant entities, decoded from data the car already sends, so the car sees no extra traffic. They are off by default. The decoding is ported from [phev-remote-plus](https://github.com/Anwo91/phev-remote-plus), which checked it against a 2014 car.
+
+| Entity | What it shows |
+|---|---|
+| Power Switch | `off`, `acc` or `on`. Remote climate only works with the power switch off, so check this first when climate does nothing. |
+| Security Alarm | `disarmed`, `armed` or `triggered` |
+| Last Alarm Event | When the alarm last went off |
+| Charge Type | `none`, `normal`, `trickle` or `quick` (CHAdeMO rapid charging) |
+| Waiting For Car Charge Timer | On while the car is plugged in but held back by its own charge timer. If a smart charger or your energy supplier decides when the car charges, this should stay off; if it's on, the car's timer is overruling the charger. |
+| Scheduled Charge Failed | The car could not start a scheduled charge |
+| Car Charge Timer | The car's own charge timer is on. The schedule is in the attributes. |
+| Car Climate Timer | The car's own climate timer is on. The start times are in the attributes. |
+| Battery Heater | 2014–2017 cars only: the drive battery heater is running |
+| Battery Too Cold | The car asks to be plugged in to protect a cold drive battery |
+| EV-ECU Error | The car reports an EV-ECU communication error (diagnostic) |
+| Car Screen In Use | The car's own screen is in use; the car then ignores some remote commands |
+| Registration Standby | The car is in registration mode (diagnostic) |
+| Car Clock | The car's own clock, which its charge and climate timers run on (diagnostic) |
+
+### Switch them on
+
+Options are set with environment variables in a systemd drop-in file, not with command-line flags. An older build such as `phev2mqtt-stable` ignores the variables but would refuse to start with a flag it doesn't know, so a rollback keeps working.
+
+```bash
+mkdir -p /etc/systemd/system/phev2mqtt.service.d
+nano /etc/systemd/system/phev2mqtt.service.d/options.conf
+```
+
+```ini
+[Service]
+Environment=EXTRA_SENSORS=true
+```
+
+```bash
+systemctl daemon-reload
+systemctl restart phev2mqtt
+```
+
+The entities appear on the **PHEV &lt;VIN&gt;** device (**Settings → Devices & Services → MQTT**) once the car sends its next full update, within a few minutes. **Add to dashboard** on the device page puts them on a dashboard.
+
+### Switch them off
+
+Set `EXTRA_SENSORS=false` in `options.conf` (or delete the file), then:
+
+```bash
+systemctl daemon-reload
+systemctl restart phev2mqtt
+```
+
+phev2mqtt then removes these entities from Home Assistant. A rollback ([Section 16](#16-how-to-update-and-roll-back-phev2mqtt)) removes them too.
+
+### Fixed in the same builds (always on)
+
+- **Charger Connected** now reads connected while the car is plugged in inside its charge window but not charging. It used to read unplugged.
+- **Interior Lights** now reads on for every value the car uses for on.

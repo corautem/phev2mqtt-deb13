@@ -26,6 +26,13 @@ mqtt:
       unique_id: phev_reboot_button
       icon: mdi:restart-alert
 
+    # NEW
+    - name: "PHEV Rollback phev2mqtt"
+      command_topic: "phev2mqtt/rollback/set"
+      payload_press: "rollback"
+      unique_id: phev_rollback_button
+      icon: mdi:backup-restore
+
   switch:
     - name: "PHEV WiFi"
       command_topic: "phev2mqtt/wifi/set"
@@ -61,6 +68,11 @@ mqtt:
       unique_id: phev_service_uptime
       unit_of_measurement: "s"
       icon: mdi:timer
+    # NEW
+    - name: "PHEV Running Build"
+      state_topic: "phev2mqtt/service/build"
+      unique_id: phev_service_build
+      icon: mdi:source-branch
 
     # NEW
     - name: "PHEV Watchdog Last Action"

@@ -33,6 +33,10 @@ cards:
       - entity: sensor.phev_watchdog_last_action
         name: Watchdog Last Action
         icon: mdi:robot-outline
+      # NEW
+      - entity: sensor.phev_running_build
+        name: Running Build
+        icon: mdi:source-branch
 
   - type: horizontal-stack
     cards:
@@ -95,4 +99,18 @@ cards:
             payload: reboot
           confirmation:
             text: "Reboot the whole PHEV gateway VM? Takes about a minute."
+        icon_height: 40px
+
+      # NEW
+      - type: button
+        name: Rollback
+        icon: mdi:backup-restore
+        tap_action:
+          action: call-service
+          service: mqtt.publish
+          service_data:
+            topic: phev2mqtt/rollback/set
+            payload: rollback
+          confirmation:
+            text: "Switch phev2mqtt back to the build that ran before your updates (phev2mqtt-stable)?"
         icon_height: 40px
