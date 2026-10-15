@@ -28,7 +28,7 @@ This guide documents the full process of migrating the [buxtronix/phev2mqtt](htt
 18. [Known Issues and Fixes](#18-known-issues-and-fixes)
 19. [Self-Healing Watchdog](#19-self-healing-watchdog)
 20. [Optional Extra Sensors](#20-optional-extra-sensors)
-21. [Vehicle Settings (Read-Only)](#21-vehicle-settings-read-only)
+21. [Vehicle Settings](#21-vehicle-settings)
 
 ---
 
@@ -1857,13 +1857,21 @@ phev2mqtt then removes these entities from Home Assistant. A rollback ([Section 
 
 ---
 
-## 21. Vehicle Settings (Read-Only)
+## 21. Vehicle Settings
 
 > **Optional.** Needs a [corautem/phev2mqtt](https://github.com/corautem/phev2mqtt) build from October 2026 or later, installed with [Section 16](#16-how-to-update-and-roll-back-phev2mqtt).
 
-The car's own customisable functions, the ones Mitsubishi's app lists under "Vehicle settings", can be shown in Home Assistant: lights, locks and unlock mode, lock beeps and horn answerback, wipers, turn signals, power windows and A/C behaviour. The car reports them itself; which ones appear depends on how your car is equipped. The decoding is ported from [phev-remote-plus](https://github.com/Anwo91/phev-remote-plus), which worked it out from Mitsubishi's app.
+The car's own customisable functions, the ones Mitsubishi's app lists under "Vehicle settings", can be shown and changed in Home Assistant: lights, locks and unlock mode, lock beeps and horn answerback, wipers, turn signals, power windows and A/C behaviour. The car reports them itself; which ones appear depends on how your car is equipped. The decoding is ported from [phev-remote-plus](https://github.com/Anwo91/phev-remote-plus), which worked it out from Mitsubishi's app.
 
-For now they are **read-only**: phev2mqtt shows each setting and its current value, but cannot change it yet. Compare them with your car before changes are switched on in a later version.
+`VEHICLE_SETTINGS` has three values:
+
+| Value | What you get |
+|---|---|
+| `off` (default) | Nothing; any vehicle settings entities are removed |
+| `read` | Each setting as a read-only sensor in the **Diagnostic** section |
+| `write` | Each setting as a drop-down in the **Configuration** section that changes it on the car |
+
+Start with `read`, check a few values against the car, and only then switch to `write`.
 
 ### Switch them on
 
@@ -1884,11 +1892,43 @@ systemctl daemon-reload
 systemctl restart phev2mqtt
 ```
 
-The settings appear in the **Diagnostic** section of the **PHEV &lt;VIN&gt;** device, named after their group, for example **Phev Lights: Headlights ON when exiting Vehicle** or **Phev Door locks: Automatic Unlock**. Each one shows its current option; its attributes list the options your car offers. **Phev Vehicle Settings Changes** shows whether the car currently accepts changes (`allowed` or `refused`).
+The settings appear on the **PHEV &lt;VIN&gt;** device, named after their group, for example **Phev Lights: Headlights ON when exiting Vehicle** or **Phev Door locks: Automatic Unlock**. **Phev Vehicle Settings Changes** shows whether the car currently accepts changes (`allowed` or `refused`).
 
-The car sends its settings a few at a time, carrying on through its list while phev2mqtt is connected, so the list fills in over the first minutes, or longer. Once a setting has appeared it stays, and keeps its last value across restarts of phev2mqtt and Home Assistant.
+The car sends its settings a few at a time, carrying on through its list while phev2mqtt is connected, so the list fills in over the first minutes or hours. Once a setting has appeared it stays, and phev2mqtt remembers it across restarts of phev2mqtt and Home Assistant.
 
-The theft-alarm settings are never shown, as in Mitsubishi's own app.
+The theft-alarm settings and "reset all settings" are never offered, as in Mitsubishi's own app.
+
+### Check the readings first
+
+Pick settings you can see on the car, for example:
+
+- **Turn Signal Lights Answerback**: count the indicator flashes when you lock and unlock with the remote. If the car is set to deadlock with one press, locking flashes three times for the deadlock instead.
+- **Auto Fold Mirrors**: whether the mirrors fold when you lock.
+- **Duration Dome Light Remains On after Door is Closed**: time the interior light after closing the door.
+
+### Changing settings
+
+Set `Environment=VEHICLE_SETTINGS=write` in `options.conf`, then `systemctl daemon-reload && systemctl restart phev2mqtt`. The read-only sensors become drop-downs offering only the options your car has.
+
+When you pick a new option, phev2mqtt does what Mitsubishi's app does: it sends the change, waits up to 8 seconds for the car to report the new value, then tells the car to save it. One change runs at a time. **Phev Vehicle Settings Last Change** shows the result, for example `Lights: Headlights ON when exiting Vehicle -> 30 seconds: done`. If the car doesn't confirm, the drop-down goes back to what the car reports, and the result says to check the setting in the car.
+
+phev2mqtt refuses a change while the car isn't connected, while the car reports it doesn't accept changes, or for an option your car doesn't offer.
+
+### Snapshots and restoring
+
+Before the first change after each start, phev2mqtt saves every known setting to a file in `/var/lib/phev2mqtt`, named like `vehicle-settings-20261015-093521.json`. To put all settings back the way they were in a snapshot, with phev2mqtt running in `write` mode and connected to the car:
+
+```bash
+ls -l /var/lib/phev2mqtt/
+source <(grep -E '^MQTT_(HOST|USER|PASS)=' /usr/local/bin/phev-wifi-status.sh)
+phev2mqtt --config=/dev/null client restore-settings --mqtt_server tcp://$MQTT_HOST:1883 \
+  --mqtt_username $MQTT_USER --mqtt_password $MQTT_PASS \
+  --file /var/lib/phev2mqtt/vehicle-settings-DATE-TIME.json
+```
+
+phev2mqtt changes the settings that differ, one at a time, and reports each in **Phev Vehicle Settings Last Change**; settings that already match show as `already set, nothing to change`. You can also change any setting back on the car's own screen.
+
+> **Before rolling back** ([Section 16](#16-how-to-update-and-roll-back-phev2mqtt)): a rollback removes these entities, but settings you changed stay changed on the car. Restore a snapshot first if you want them back.
 
 ### Switch them off
 
@@ -1899,4 +1939,4 @@ systemctl daemon-reload
 systemctl restart phev2mqtt
 ```
 
-phev2mqtt then removes these entities from Home Assistant. A rollback ([Section 16](#16-how-to-update-and-roll-back-phev2mqtt)) removes them too.
+phev2mqtt then removes these entities, and the values it remembered, from Home Assistant and the broker. A rollback removes them too. Settings on the car are not changed by switching off.
