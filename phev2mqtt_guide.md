@@ -1910,13 +1910,13 @@ Pick settings you can see on the car, for example:
 
 Set `Environment=VEHICLE_SETTINGS=write` in `options.conf`, then `systemctl daemon-reload && systemctl restart phev2mqtt`. The read-only sensors become drop-downs offering only the options your car has.
 
-When you pick a new option, phev2mqtt does what Mitsubishi's app does: it sends the change, waits up to 8 seconds for the car to report the new value, then tells the car to save it. One change runs at a time. **Phev Vehicle Settings Last Change** shows the result, for example `Lights: Headlights ON when exiting Vehicle -> 30 seconds: done`. If the car doesn't confirm, the drop-down goes back to what the car reports, and the result says to check the setting in the car.
+When you pick a new option, phev2mqtt does what Mitsubishi's app does: it sends the change, waits up to 8 seconds for the car to report the new value, then tells the car to save it. One change runs at a time. **Phev Vehicle Settings Last Change** shows the result, for example `Lights: Headlights ON when exiting Vehicle -> 30 seconds: done`. If the car doesn't confirm, the drop-down goes back to what the car reports, and the result says to check the setting in the car. If the connection to the car drops between the change and the save, the result says so, and phev2mqtt sends the save when the car reconnects.
 
 phev2mqtt refuses a change while the car isn't connected, while the car reports it doesn't accept changes, or for an option your car doesn't offer.
 
 ### Snapshots and restoring
 
-Before the first change after each start, phev2mqtt saves every known setting to a file in `/var/lib/phev2mqtt`, named like `vehicle-settings-20261015-093521.json`. To put all settings back the way they were in a snapshot, with phev2mqtt running in `write` mode and connected to the car:
+Before the first change after each start, phev2mqtt saves every known setting to a file in `/var/lib/phev2mqtt`, named like `vehicle-settings-20261015-093521.json`. A setting the car reports only later is added to that file, with its old value, before it is first changed. To put all settings back the way they were in a snapshot, with phev2mqtt running in `write` mode and connected to the car:
 
 ```bash
 ls -l /var/lib/phev2mqtt/
