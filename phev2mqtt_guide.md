@@ -1445,6 +1445,8 @@ systemd-ssh-generator[992]: Failed to query local AF_VSOCK CID: Cannot assign re
 
 **Symptom:** Car is connected and state sensors (locks, doors, battery) update normally in Home Assistant, but commands like windscreen heat or AC have no effect. Restarting the phev2mqtt service fixes it.
 
+> **Encoding errors:** if `journalctl -u phev2mqtt -o cat | grep "too many errors"` shows `Disconnecting due to too many errors`, phev2mqtt and the car got out of step on their packet keys. Switch on `KEY_RESYNC` ([Section 20](#20-optional-extra-sensors)).
+
 > **Check this first:** the car only runs remote climate with its power switch **off**, and accepts the command without acting on it otherwise. With the extra sensors switched on ([Section 20](#20-optional-extra-sensors)), the **Power Switch** sensor shows this. If it reads `acc` or `on`, the cause is the car, not the connection.
 
 **Cause:** phev2mqtt maintains a persistent TCP connection to the car (`192.168.8.46:8080`). This connection can silently enter a hung state where the socket appears open but outgoing writes fail. State reads continue working because the car pushes register notifications to phev2mqtt regardless, but write commands (heating, AC, locks) require a functioning bidirectional TCP session.
@@ -1850,6 +1852,22 @@ phev2mqtt then removes these entities from Home Assistant. A rollback ([Section 
 - **Charger Connected** now reads connected while the car is plugged in inside its charge window but not charging. It used to read unplugged.
 - **Interior Lights** now reads on for every value the car uses for on.
 - **After a Home Assistant restart**, every phev2mqtt sensor gets its last known value again within a few seconds. The car sends most values only when they change, so they used to stay unknown until phev2mqtt restarted.
+
+### Recover from encoding errors (KEY_RESYNC)
+
+phev2mqtt and the car scramble every packet with a key that moves on with each packet. If the two get out of step, the car rejects packets and names the key it expected. Older builds ignored that name and kept resending with the next wrong key, until phev2mqtt gave up with `Disconnecting due to too many errors` in its log, for example during a quick series of vehicle setting changes ([Section 21](#21-vehicle-settings)).
+
+With this line in `options.conf`, phev2mqtt moves to the key the car expects, resends a rejected write at most 3 times, and asks the car for a new key if complaints pile up:
+
+```ini
+Environment=KEY_RESYNC=true
+```
+
+Its log then shows `%PHEV_KEY_RESYNC%` lines where it recovered, instead of the disconnect:
+
+```bash
+journalctl -u phev2mqtt -o cat | grep -E 'KEY_RESYNC|REKEY|SETREG_RETRY|too many errors'
+```
 
 ### Good to know
 
