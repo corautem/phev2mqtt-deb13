@@ -1892,7 +1892,7 @@ systemctl daemon-reload
 systemctl restart phev2mqtt
 ```
 
-The settings appear on the **PHEV &lt;VIN&gt;** device, named after their group, for example **Phev Lights: Headlights ON when exiting Vehicle** or **Phev Door locks: Automatic Unlock**. **Phev Vehicle Settings Changes** shows whether the car currently accepts changes (`allowed` or `refused`).
+The settings appear on the **PHEV &lt;VIN&gt;** device, named after their group, for example **Phev Lights: Headlights ON when exiting Vehicle** or **Phev Door locks: Automatic Unlock**. **Phev Car Accepts Setting Changes** shows whether the car currently accepts changes (`allowed` or `refused`).
 
 The car sends its settings a few at a time, carrying on through its list while phev2mqtt is connected, so the list fills in over the first minutes or hours. Once a setting has appeared it stays, and phev2mqtt remembers it across restarts of phev2mqtt and Home Assistant.
 
@@ -1910,9 +1910,11 @@ Pick settings you can see on the car, for example:
 
 Set `Environment=VEHICLE_SETTINGS=write` in `options.conf`, then `systemctl daemon-reload && systemctl restart phev2mqtt`. The read-only sensors become drop-downs offering only the options your car has.
 
+Changes are locked by **Phev Vehicle Settings: Allow Changes**, a switch in the same **Configuration** section, so a setting can't be changed by mistake. It is off whenever phev2mqtt starts. While it's off, the drop-downs still show the car's values, but a change is refused and the drop-down goes back to what the car has. Switch it on to make changes; it switches itself off 10 minutes after you switch it on or after your last change, or switch it off yourself when you're done.
+
 When you pick a new option, phev2mqtt does what Mitsubishi's app does: it sends the change, waits up to 8 seconds for the car to report the new value, then tells the car to save it. One change runs at a time. **Phev Vehicle Settings Last Change** shows the result, for example `Lights: Headlights ON when exiting Vehicle -> 30 seconds: done`. If the car doesn't confirm, the drop-down goes back to what the car reports, and the result says to check the setting in the car. If the connection to the car drops between the change and the save, the result says so, and phev2mqtt sends the save when the car reconnects.
 
-phev2mqtt refuses a change while the car isn't connected, while the car reports it doesn't accept changes, or for an option your car doesn't offer.
+phev2mqtt refuses a change while **Allow Changes** is off, while the car isn't connected, while the car reports it doesn't accept changes, or for an option your car doesn't offer.
 
 ### Snapshots and restoring
 
@@ -1926,7 +1928,7 @@ phev2mqtt --config=/dev/null client restore-settings --mqtt_server tcp://$MQTT_H
   --file /var/lib/phev2mqtt/vehicle-settings-DATE-TIME.json
 ```
 
-phev2mqtt changes the settings that differ, one at a time, and reports each in **Phev Vehicle Settings Last Change**; settings that already match show as `already set, nothing to change`. You can also change any setting back on the car's own screen.
+The restore switches on **Allow Changes** itself. phev2mqtt changes the settings that differ, one at a time, and reports each in **Phev Vehicle Settings Last Change**; settings that already match show as `already set, nothing to change`. You can also change any setting back on the car's own screen.
 
 > **Before rolling back** ([Section 16](#16-how-to-update-and-roll-back-phev2mqtt)): a rollback removes these entities, but settings you changed stay changed on the car. Restore a snapshot first if you want them back.
 
