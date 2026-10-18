@@ -10,6 +10,8 @@ All entities belong to the **PHEV &lt;VIN&gt;** device (**Settings → Devices &
 - **settings**: `VEHICLE_SETTINGS=read` or `write`
 - **write**: `VEHICLE_SETTINGS=write`
 
+The gateway's own entities from [guide Section 14](./phev2mqtt_guide.md#14-wifi-status-scripts-and-mqtt-sensors), such as WiFi Status and the Rollback button, are on a separate **PHEV Gateway** device.
+
 ## Controls
 
 | Entity | Type | What it does | Needs |

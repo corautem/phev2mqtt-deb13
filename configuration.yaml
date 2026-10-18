@@ -1,40 +1,52 @@
 mqtt:
   button:
-    - name: "PHEV Reconnect"
+    - name: "Reconnect"
       command_topic: "phev2mqtt/reconnect/set"
       payload_press: "reconnect"
       unique_id: phev_reconnect_button
+      default_entity_id: button.phev_reconnect
+      # The PHEV Gateway device, named once here and reused below with
+      # *phev_gateway (both must be in the same file).
+      device: &phev_gateway
+        identifiers: ["phev2mqtt_gateway"]
+        name: "PHEV Gateway"
+        manufacturer: "phev2mqtt"
+        model: "Debian 13 VM"
 
-    # NEW
-    - name: "PHEV Restart Service"
+    - name: "Restart Service"
       command_topic: "phev2mqtt/service/restart"
       payload_press: "restart"
       unique_id: phev_service_restart_button
+      default_entity_id: button.phev_restart_service
       icon: mdi:restart
+      device: *phev_gateway
 
-    # NEW
-    - name: "PHEV WiFi Driver Reload"
+    - name: "WiFi Driver Reload"
       command_topic: "phev2mqtt/hardreset/set"
       payload_press: "hardreset"
       unique_id: phev_hardreset_button
+      default_entity_id: button.phev_wifi_driver_reload
       icon: mdi:wifi-cog
+      device: *phev_gateway
 
-    # NEW
-    - name: "PHEV Reboot VM"
+    - name: "Reboot VM"
       command_topic: "phev2mqtt/reboot/set"
       payload_press: "reboot"
       unique_id: phev_reboot_button
+      default_entity_id: button.phev_reboot_vm
       icon: mdi:restart-alert
+      device: *phev_gateway
 
-    # NEW
-    - name: "PHEV Rollback phev2mqtt"
+    - name: "Rollback phev2mqtt"
       command_topic: "phev2mqtt/rollback/set"
       payload_press: "rollback"
       unique_id: phev_rollback_button
+      default_entity_id: button.phev_rollback_phev2mqtt
       icon: mdi:backup-restore
+      device: *phev_gateway
 
   switch:
-    - name: "PHEV WiFi"
+    - name: "WiFi"
       command_topic: "phev2mqtt/wifi/set"
       state_topic: "phev2mqtt/wifi/enabled"
       payload_on: "ON"
@@ -42,40 +54,55 @@ mqtt:
       state_on: "ON"
       state_off: "OFF"
       unique_id: phev_wifi_switch
+      default_entity_id: switch.phev_wifi
+      device: *phev_gateway
 
   sensor:
-    - name: "PHEV WiFi IP"
+    - name: "WiFi IP"
       state_topic: "phev2mqtt/wifi/ip"
       unique_id: phev_wifi_ip
-    - name: "PHEV WiFi Signal"
+      default_entity_id: sensor.phev_wifi_ip
+      device: *phev_gateway
+    - name: "WiFi Signal"
       state_topic: "phev2mqtt/wifi/signal"
       unit_of_measurement: "dBm"
       unique_id: phev_wifi_signal
-    - name: "PHEV WiFi SSID"
+      default_entity_id: sensor.phev_wifi_signal
+      device: *phev_gateway
+    - name: "WiFi SSID"
       state_topic: "phev2mqtt/wifi/ssid"
       unique_id: phev_wifi_ssid
-    - name: "PHEV WiFi Status"
+      default_entity_id: sensor.phev_wifi_ssid
+      device: *phev_gateway
+    - name: "WiFi Status"
       state_topic: "phev2mqtt/wifi/status"
       unique_id: phev_wifi_status
+      default_entity_id: sensor.phev_wifi_status
+      device: *phev_gateway
 
-    # NEW
-    - name: "PHEV Service State"
+    - name: "Service State"
       state_topic: "phev2mqtt/service/state"
       unique_id: phev_service_state
+      default_entity_id: sensor.phev_service_state
       icon: mdi:cog-sync
-    - name: "PHEV Service Uptime"
+      device: *phev_gateway
+    - name: "Service Uptime"
       state_topic: "phev2mqtt/service/uptime"
       unique_id: phev_service_uptime
+      default_entity_id: sensor.phev_service_uptime
       unit_of_measurement: "s"
       icon: mdi:timer
-    # NEW
-    - name: "PHEV Running Build"
+      device: *phev_gateway
+    - name: "Running Build"
       state_topic: "phev2mqtt/service/build"
       unique_id: phev_service_build
+      default_entity_id: sensor.phev_running_build
       icon: mdi:source-branch
+      device: *phev_gateway
 
-    # NEW
-    - name: "PHEV Watchdog Last Action"
+    - name: "Watchdog Last Action"
       state_topic: "phev2mqtt/watchdog/action"
       unique_id: phev_watchdog_action
+      default_entity_id: sensor.phev_watchdog_last_action
       icon: mdi:robot-outline
+      device: *phev_gateway
