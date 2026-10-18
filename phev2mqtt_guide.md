@@ -1852,6 +1852,33 @@ phev2mqtt then removes these entities from Home Assistant. A rollback ([Section 
 - **Charger Connected** now reads connected while the car is plugged in inside its charge window but not charging. It used to read unplugged.
 - **Interior Lights** now reads on for every value the car uses for on.
 - **After a Home Assistant restart**, every phev2mqtt sensor gets its last known value again within a few seconds. The car sends most values only when they change, so they used to stay unknown until phev2mqtt restarted.
+- **Phev climate state** shows the running mode (`heat`, `cool`, `windscreen`) or `off`. It used to always show `unknown`.
+
+### More buttons (EXTRA_COMMANDS)
+
+`Environment=EXTRA_COMMANDS=true` in `options.conf` adds these buttons to the **Controls** section:
+
+| Button | What it does |
+|---|---|
+| Phev Refresh | Asks the car to send all its values |
+| Phev Flash Lights | Headlights on for 5 seconds, to find the car; refused while the headlights are on |
+| Phev Sync Car Clock | Sets the car's clock from the VM's (set the VM's timezone first, Section 3) |
+| Phev Charge Now | Suspends the car's own charge timer, so it charges now |
+| Phev Resume Car Charge Timer | Lets the car's own charge timer decide again |
+
+**Phev Last Command Result** (Diagnostic) shows how each went, for example `Flash Lights: done`, or why the car didn't take it.
+
+### Safer climate start (CLIMATE_GUARD)
+
+`Environment=CLIMATE_GUARD=true` makes **Phev Heat**, **Phev cool**, **Phev windscreen** and **Phev climate state** start the climate the way Mitsubishi's app does:
+
+- On 2014–2017 cars, starting the climate keeps the car's own climate timer settings instead of overwriting them. Switching off only switches the climate off.
+- A start is refused, with the reason in **Phev Last Command Result**, while the power switch is ACC or ON or the car is quick charging: the car would accept it and do nothing.
+- phev2mqtt waits up to 30 seconds for the car to report the climate running, and the result says whether it did, for example `Heat 10 min: done, the climate is running`.
+
+### Set the car's clock at every connection (SYNC_CLOCK)
+
+`Environment=SYNC_CLOCK=true` sets the car's clock from the VM's once each time phev2mqtt connects to the car, as Mitsubishi's app does. The car's own charge and climate timers run on that clock.
 
 ### Recover from encoding errors (KEY_RESYNC)
 
