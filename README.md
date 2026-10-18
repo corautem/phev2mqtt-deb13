@@ -17,6 +17,7 @@ A complete guide for running [phev2mqtt](https://github.com/buxtronix/phev2mqtt)
 - Updating phev2mqtt with every build kept, and rolling back in one step (script or Home Assistant button)
 - Optional extra car sensors: power switch, security alarm, charge type, the car's own charge and climate timers
 - The car's own settings (lights, locks, wipers, A/C behaviour) shown and changed in Home Assistant, with snapshots to restore them
+- Example automations: lock reminder, climate and command notifications, voice control, a charging light, gateway alerts
 - Useful diagnostic commands
 - Known issues and fixes
 

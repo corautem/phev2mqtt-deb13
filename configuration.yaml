@@ -85,6 +85,8 @@ mqtt:
       unique_id: phev_service_state
       default_entity_id: sensor.phev_service_state
       icon: mdi:cog-sync
+      # Unavailable when the VM stops reporting (it reports every 30 s).
+      expire_after: 120
       device: *phev_gateway
     - name: "Service Uptime"
       state_topic: "phev2mqtt/service/uptime"
