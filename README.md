@@ -40,7 +40,6 @@ A complete guide for running [phev2mqtt](https://github.com/buxtronix/phev2mqtt)
 | [phev2mqtt_guide.md](./phev2mqtt_guide.md) | Complete setup guide |
 | [lovelace-card.yaml](./lovelace-card.yaml) | Home Assistant Lovelace card for the PHEV Gateway dashboard |
 | [configuration.yaml](./configuration.yaml) | Home Assistant MQTT sensors, switch and buttons for the gateway |
-| [templates.yaml](./templates.yaml) | Home Assistant template sensor for a readable service uptime |
 | [entities-outlander-phev-2014-2017.md](./entities-outlander-phev-2014-2017.md) | Every Home Assistant entity a 2014–2017 Outlander PHEV gets, and the vehicle settings it offers |
 
 ## Credits
