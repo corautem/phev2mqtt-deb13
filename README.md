@@ -39,6 +39,7 @@ A complete guide for migrating [buxtronix/phev2mqtt](https://github.com/buxtroni
 | [lovelace-card.yaml](./lovelace-card.yaml) | Home Assistant Lovelace card for the PHEV Gateway dashboard |
 | [configuration.yaml](./configuration.yaml) | Home Assistant MQTT sensors, switch and buttons for the gateway |
 | [templates.yaml](./templates.yaml) | Home Assistant template sensor for a readable service uptime |
+| [entities-outlander-phev-2014-2017.md](./entities-outlander-phev-2014-2017.md) | Every Home Assistant entity a 2014–2017 Outlander PHEV gets, and the vehicle settings it offers |
 
 ## Credits
 

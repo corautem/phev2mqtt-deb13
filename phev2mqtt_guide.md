@@ -1941,7 +1941,7 @@ The settings appear on the **PHEV &lt;VIN&gt;** device, named after their group,
 
 The car sends its settings a few at a time, carrying on through its list while phev2mqtt is connected, so the list fills in over the first minutes or hours. Once a setting has appeared it stays, and phev2mqtt remembers it across restarts of phev2mqtt and Home Assistant.
 
-The theft-alarm settings and "reset all settings" are never offered, as in Mitsubishi's own app.
+The theft-alarm settings and "reset all settings" are never offered, as in Mitsubishi's own app. [entities-outlander-phev-2014-2017.md](./entities-outlander-phev-2014-2017.md) lists every entity and the settings a 2014–2017 car offers.
 
 ### Check the readings first
 
