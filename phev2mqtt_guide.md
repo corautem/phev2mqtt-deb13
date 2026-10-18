@@ -2,7 +2,9 @@
 
 > **Disclaimer:** This guide is provided "as is" without warranty of any kind. Follow it at your own risk. The author is not responsible for any damage to your vehicle, home automation system, or any other hardware or software. Always make sure you have backups and Proxmox snapshots before making changes. This guide is not affiliated with or endorsed by Mitsubishi Motors, Proxmox, Home Assistant, or any other mentioned product or service.
 
-This guide documents the full process of migrating the [buxtronix/phev2mqtt](https://github.com/buxtronix/phev2mqtt) service from a Raspberry Pi to a Debian 13 VM running on Proxmox, including WiFi adapter setup, Home Assistant integration, and automation scripts.
+This guide documents the full process of running [phev2mqtt](https://github.com/buxtronix/phev2mqtt) on a Debian 13 VM in Proxmox, as a new install or migrating from a Raspberry Pi, including WiFi adapter setup, Home Assistant integration, and automation scripts.
+
+> **New install or migration?** The steps are the same. On a new install, set up the MQTT broker first ([Section 1](#set-up-the-mqtt-broker-new-install)) and skip the parts marked **Migrating from a Raspberry Pi only**. When migrating, keep your broker and its credentials, and stop phev2mqtt on the Pi ([Section 11](#11-disable-phev2mqtt-on-the-raspberry-pi)) before starting it on the VM. Either way, the VM has to be registered with the car ([Section 9](#9-test-connection-to-the-car)); the car registers each device separately.
 
 ---
 
@@ -18,7 +20,7 @@ This guide documents the full process of migrating the [buxtronix/phev2mqtt](htt
 8. [Build and Install phev2mqtt](#8-build-and-install-phev2mqtt)
 9. [Test Connection to the Car](#9-test-connection-to-the-car)
 10. [Configure phev2mqtt as a Systemd Service](#10-configure-phev2mqtt-as-a-systemd-service)
-11. [Disable phev2mqtt on the Raspberry Pi](#11-disable-phev2mqtt-on-the-raspberry-pi)
+11. [Disable phev2mqtt on the Raspberry Pi](#11-disable-phev2mqtt-on-the-raspberry-pi) (migrating from a Raspberry Pi only)
 12. [Make wpa_supplicant Start on Boot](#12-make-wpa_supplicant-start-on-boot)
 13. [Home Assistant Integration](#13-home-assistant-integration)
 14. [WiFi Status Scripts and MQTT Sensors](#14-wifi-status-scripts-and-mqtt-sensors)
@@ -40,9 +42,21 @@ Before starting, make sure you have:
 - A Debian 13 (Trixie) ISO downloaded
 - A **TP-Link Archer T3U Plus (AC1300)** USB WiFi adapter (or similar RTL88x2BU chipset)
 - A Mitsubishi Outlander PHEV with WiFi hotspot credentials (SSID and password)
-- Home Assistant running with the **Mosquitto MQTT broker** add-on installed
+- Home Assistant running with the **Mosquitto broker** installed (on a new install, set it up as below)
 - MQTT broker credentials (username and password)
-- Your Raspberry Pi running phev2mqtt (to be decommissioned)
+- *Migrating from a Raspberry Pi only:* your Raspberry Pi running phev2mqtt (to be decommissioned)
+
+### Set up the MQTT broker (new install)
+
+Skip this if you're migrating from a Raspberry Pi: keep using the broker and credentials you have.
+
+1. **Install the broker:** in Home Assistant, go to **Settings → Apps** (called **Add-ons** before Home Assistant 2026.2), open the store, find **Mosquitto broker** and install it. Switch on **Start on boot** and **Watchdog**, then press **Start**.
+2. **Create a login for phev2mqtt:** go to **Settings → People → Users** and add a user, for example `phev2mqtt`, with a strong password. It doesn't need to be an administrator. The **Users** tab only shows with **Advanced mode** on, in your user profile. The broker accepts Home Assistant users, so this username and password are `YOUR_MQTT_USER` and `YOUR_MQTT_PASS` from Section 9 on. Don't call it `homeassistant` or `addons`: the broker keeps those names for itself.
+3. **Connect Home Assistant to the broker:** **Settings → Devices & Services** shows **MQTT** as discovered. Press **Add** and confirm. phev2mqtt's entities come in through this integration ([Section 13](#13-home-assistant-integration)).
+
+The broker listens on port 1883 at Home Assistant's IP address, `HA_IP_ADDRESS` in this guide. [Section 9](#test-mqtt-connection) tests the login from the VM.
+
+> **Home Assistant Container or Core** has no apps: run a Mosquitto broker yourself, for example in Docker, and add the MQTT integration with its address.
 
 ---
 
@@ -499,7 +513,7 @@ StandardError=journal
 WantedBy=multi-user.target
 ```
 
-> **Important — Raspberry Pi conflict:** If your Raspberry Pi is still running phev2mqtt and connected to the same MQTT broker, both instances will use the same client ID (`phev2mqtt`) and keep kicking each other off. You will see `write: broken pipe` errors in the logs and `Client phev2mqtt already connected, closing old connection` in the Mosquitto broker logs. **Stop and disable phev2mqtt on the Pi before starting the service on the VM** — see Section 11.
+> **Migrating from a Raspberry Pi only — Pi conflict:** If your Raspberry Pi is still running phev2mqtt and connected to the same MQTT broker, both instances will use the same client ID (`phev2mqtt`) and keep kicking each other off. You will see `write: broken pipe` errors in the logs and `Client phev2mqtt already connected, closing old connection` in the Mosquitto broker logs. **Stop and disable phev2mqtt on the Pi before starting the service on the VM** — see Section 11.
 
 ### Enable and start the service
 
@@ -521,6 +535,8 @@ You should see `%PHEV_TCP_CONNECTED%` in the logs.
 ---
 
 ## 11. Disable phev2mqtt on the Raspberry Pi
+
+> **Migrating from a Raspberry Pi only.** On a new install, skip to [Section 12](#12-make-wpa_supplicant-start-on-boot).
 
 The PHEV only allows one WiFi client connection at a time. If the Pi is still running phev2mqtt it will conflict with the VM — they will keep kicking each other off (you will see `Client phev2mqtt already connected, closing old connection` in the MQTT broker logs).
 
@@ -1117,7 +1133,7 @@ cards:
 
 ## 16. How to Update and Roll Back phev2mqtt
 
-Every build is kept as its own file, `/usr/local/bin/phev2mqtt-<version>`, and `/usr/local/bin/phev2mqtt` becomes a link to the one in use. The build that was running before your first update with this section is kept as `phev2mqtt-stable`. Rolling back points the link at it again. The service file from Section 10 never changes.
+Every build is kept as its own file, `/usr/local/bin/phev2mqtt-<version>`, and `/usr/local/bin/phev2mqtt` becomes a link to the one in use. The build that was running before your first update with this section is kept as `phev2mqtt-stable`; on a new install, that's the build from Section 8. Rolling back points the link at it again. The service file from Section 10 never changes.
 
 ### Before every update
 
@@ -1126,7 +1142,7 @@ Every build is kept as its own file, `/usr/local/bin/phev2mqtt-<version>`, and `
 
 ### Point your clone at the fork (once)
 
-If you cloned [buxtronix/phev2mqtt](https://github.com/buxtronix/phev2mqtt) before this guide switched to the fork:
+Only if you cloned [buxtronix/phev2mqtt](https://github.com/buxtronix/phev2mqtt) before this guide switched to the fork. Skip this if you cloned the fork in Section 8, as on a new install.
 
 ```bash
 cd ~/phev2mqtt
@@ -1250,9 +1266,20 @@ ln -sfn /usr/local/bin/phev2mqtt-VERSION /usr/local/bin/phev2mqtt
 systemctl restart phev2mqtt
 ```
 
-> **Optional features stay switched on across a rollback.** They are set with environment variables ([Section 20](#20-optional-extra-sensors)), which `phev2mqtt-stable` ignores, so they come back when you install a newer build again. Section 20 explains how to switch them off.
-
 > **If the VM itself is in trouble**, restore the Proxmox snapshot you took before the update.
+
+### Optional features and rollback
+
+The optional features are set with environment variables ([Section 20](#20-optional-extra-sensors)), and these stay set across a rollback. What a rollback does with them depends on how old `phev2mqtt-stable` is:
+
+- **A build from before October 2026**, if you set up the VM before the optional features existed, ignores the variables. A rollback switches every optional feature off, and they come back when you install a newer build again.
+- **A build from October 2026 or later**, if you built the fork in Section 8 from then on (new install or migration), understands them. The features stay on after a rollback and their entities come back. To go back to how phev2mqtt behaves without them, switch them off instead (Sections 20 and 21).
+
+To see which one you have:
+
+```bash
+/usr/local/bin/phev2mqtt-stable client mqtt --help 2>&1 | grep -q extra_sensors && echo "understands the options" || echo "older build"
+```
 
 ---
 
@@ -1528,8 +1555,8 @@ ip route del default via 192.168.8.46 dev YOUR_WIFI_INTERFACE_NAME
 ### phev2mqtt broken pipe / keeps disconnecting from MQTT
 
 **Symptom:** `write: broken pipe` in logs, service keeps restarting.
-**Cause:** Another instance of phev2mqtt (e.g. on the Raspberry Pi) is connecting with the same client ID and kicking the VM off.
-**Fix:** Stop and disable phev2mqtt on the Raspberry Pi:
+**Cause:** Another copy of phev2mqtt is connecting to the broker with the same client ID and kicking the VM off. When migrating, that's usually the Raspberry Pi.
+**Fix:** Stop the other copy. On the Raspberry Pi:
 
 ```bash
 sudo systemctl stop phev2mqtt
@@ -1817,7 +1844,7 @@ phev2mqtt can publish 14 more Home Assistant entities, decoded from data the car
 
 ### Switch them on
 
-Options are set with environment variables in a systemd drop-in file, not with command-line flags. An older build such as `phev2mqtt-stable` ignores the variables but would refuse to start with a flag it doesn't know, so a rollback keeps working.
+Options are set with environment variables in a systemd drop-in file, not with command-line flags. A build from before October 2026 ignores the variables but would refuse to start with a flag it doesn't know, so a rollback to one keeps working.
 
 ```bash
 mkdir -p /etc/systemd/system/phev2mqtt.service.d
@@ -1845,7 +1872,7 @@ systemctl daemon-reload
 systemctl restart phev2mqtt
 ```
 
-phev2mqtt then removes these entities from Home Assistant. A rollback ([Section 16](#16-how-to-update-and-roll-back-phev2mqtt)) removes them too.
+phev2mqtt then removes these entities from Home Assistant. A rollback to a build from before October 2026 removes them too; a newer `phev2mqtt-stable` keeps them while `EXTRA_SENSORS=true` is set ([Section 16](#optional-features-and-rollback)).
 
 ### Fixed in the same builds (always on)
 
@@ -1975,7 +2002,7 @@ phev2mqtt --config=/dev/null client restore-settings --mqtt_server tcp://$MQTT_H
 
 The restore switches on **Allow Changes** itself. phev2mqtt changes the settings that differ, one at a time, and reports each in **Phev Vehicle Settings Last Change**; settings that already match show as `already set, nothing to change`. You can also change any setting back on the car's own screen.
 
-> **Before rolling back** ([Section 16](#16-how-to-update-and-roll-back-phev2mqtt)): a rollback removes these entities, but settings you changed stay changed on the car. Restore a snapshot first if you want them back.
+> **Before rolling back** ([Section 16](#16-how-to-update-and-roll-back-phev2mqtt)): settings you changed stay changed on the car, whichever build you roll back to. A `phev2mqtt-stable` from before October 2026 also removes these entities and can't restore a snapshot, so restore one first if you want the settings back.
 
 ### Switch them off
 
@@ -1986,4 +2013,4 @@ systemctl daemon-reload
 systemctl restart phev2mqtt
 ```
 
-phev2mqtt then removes these entities, and the values it remembered, from Home Assistant and the broker. A rollback removes them too. Settings on the car are not changed by switching off.
+phev2mqtt then removes these entities, and the values it remembered, from Home Assistant and the broker. A rollback to a build from before October 2026 removes them too. Settings on the car are not changed by switching off.

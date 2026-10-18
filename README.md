@@ -1,16 +1,17 @@
 # phev2mqtt on Proxmox Debian 13
 
-A complete guide for migrating [buxtronix/phev2mqtt](https://github.com/buxtronix/phev2mqtt) from a Raspberry Pi to a Debian 13 VM running on Proxmox. It builds [corautem/phev2mqtt](https://github.com/corautem/phev2mqtt), a fork with connection fixes and optional extra sensors.
+A complete guide for running [phev2mqtt](https://github.com/buxtronix/phev2mqtt) on a Debian 13 VM in Proxmox, either as a new install or migrating from a Raspberry Pi. It builds [corautem/phev2mqtt](https://github.com/corautem/phev2mqtt), a fork with connection fixes and optional extra sensors.
 
 ## What this guide covers
 
+- Setting up the Mosquitto MQTT broker in Home Assistant, for a new install
 - Creating a Debian 13 VM in Proxmox
 - USB WiFi adapter passthrough (TP-Link Archer T3U Plus / RTL88x2BU)
 - Installing the RTL88x2BU driver
 - Connecting to the Mitsubishi Outlander PHEV WiFi hotspot
 - Building and installing phev2mqtt from source
 - Configuring phev2mqtt as a systemd service
-- Migrating from Raspberry Pi (stopping the old instance)
+- Migrating from a Raspberry Pi: stopping the old instance (skipped on a new install)
 - Home Assistant MQTT integration and auto-discovery
 - WiFi status sensors, reconnect button and WiFi enable/disable switch in Home Assistant
 - Updating phev2mqtt with every build kept, and rolling back in one step (script or Home Assistant button)
