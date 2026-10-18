@@ -1002,17 +1002,10 @@ mqtt:
       device: *phev_gateway
     - name: "Service Uptime"
       state_topic: "phev2mqtt/service/uptime"
-      unique_id: phev_service_uptime
-      default_entity_id: sensor.phev_service_uptime
-      unit_of_measurement: "s"
-      icon: mdi:timer
-      device: *phev_gateway
-    - name: "Service Uptime Friendly"
-      state_topic: "phev2mqtt/service/uptime"
       unique_id: phev_service_uptime_friendly
       default_entity_id: sensor.phev_service_uptime_friendly
       icon: mdi:timer
-      # The same uptime, shown as "2d 3h 14m", "2h 14m" or "14m".
+      # The VM reports seconds; shown as "2d 3h 14m", "2h 14m" or "14m".
       value_template: >-
         {%- set s = value | int(0) -%}
         {%- set d = s // 86400 -%}
@@ -1032,11 +1025,23 @@ mqtt:
 
 > **Already have these entities from an earlier version of this guide?** Replace your old `mqtt:` entries with these, then reload them (**Developer tools → YAML → Manually configured MQTT entities**) or restart Home Assistant. The entities keep their entity IDs, so dashboards and automations keep working. They move onto the PHEV Gateway device, and their names get the "PHEV Gateway" prefix unless you renamed them yourself. To put the new device in an area, open it and press the pencil icon.
 
-> **Had "PHEV Service Uptime Friendly" as a template sensor in `templates.yaml`?** Earlier versions of this guide did. It's now the MQTT sensor above, so it can sit on the PHEV Gateway device: a template sensor written in YAML can't belong to a device. Swap it over in this order, so the new one keeps the entity ID your dashboard uses:
+Keep the uptime out of Home Assistant's history and logbook as well. It changes every minute, which adds about 1,500 rows a day to the database and makes its history slow to open, and restarts already show in Service State. Add this to `configuration.yaml`, or add the entity to the `exclude` list of your existing `recorder:` section, then restart Home Assistant:
+
+```yaml
+recorder:
+  exclude:
+    entities:
+      - sensor.phev_service_uptime_friendly
+```
+
+To clear the history it has already saved, run **Developer tools → Actions → Recorder: Purge entities** with that entity.
+
+> **Upgrading from an earlier version of this guide?** It had two uptime sensors: "PHEV Service Uptime" in seconds, and "PHEV Service Uptime Friendly", a template sensor in `templates.yaml`. Now there's one, the MQTT sensor above, so it can sit on the PHEV Gateway device: a template sensor written in YAML can't belong to a device. Swap them over in this order, so it keeps the entity ID your dashboard uses:
 >
-> 1. Delete its entry from `templates.yaml`, then reload **Developer tools → YAML → Template entities**.
+> 1. Delete the friendly uptime's entry from `templates.yaml`, then reload **Developer tools → YAML → Template entities**.
 > 2. In **Settings → Entities**, open **PHEV Service Uptime Friendly**, which now says it's no longer provided, and delete it.
 > 3. Add the MQTT entries above and reload **Manually configured MQTT entities**.
+> 4. Delete the old seconds sensor, `sensor.phev_service_uptime`, the same way as in step 2.
 >
 > If you skip step 2, the new sensor becomes `sensor.phev_service_uptime_friendly_2` and the dashboard card shows the old, unavailable one.
 
