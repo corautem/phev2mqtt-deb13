@@ -1,0 +1,36 @@
+# Car: heat the windscreen by voice
+#
+# Ask Assist "heat the windscreen for 20 minutes": 10, 20 or 30 minutes.
+# Speech recognition sometimes hears "heat" as "hit", so both are listed. It
+# sends the command straight to phev2mqtt, as the Phev windscreen switch
+# does, but with the duration you asked for. For heating or cooling, use
+# phev/set/climate/heat or phev/set/climate/cool.
+#
+# Change the lines marked REPLACE. README.md in this folder explains how
+# to add it to Home Assistant and what to fill in.
+
+alias: "Car: heat the windscreen by voice"
+description: Ask Assist to heat the windscreen for 10, 20 or 30 minutes.
+triggers:
+  - trigger: conversation
+    command:
+      - "(heat|hit|warm up|defrost|preheat) the [car] windscreen for 10 minutes"
+      - "(heat|hit) the car for 10 minutes"
+    id: "10"
+  - trigger: conversation
+    command:
+      - "(heat|hit|warm up|defrost|preheat) the [car] windscreen for 20 minutes"
+      - "(heat|hit) the car for 20 minutes"
+    id: "20"
+  - trigger: conversation
+    command:
+      - "(heat|hit|warm up|defrost|preheat) the [car] windscreen for 30 minutes"
+      - "(heat|hit) the car for 30 minutes"
+    id: "30"
+actions:
+  - action: mqtt.publish
+    data:
+      topic: phev/set/climate/windscreen
+      payload: "{{ trigger.id }}"
+  - set_conversation_response: "Heating the windscreen for {{ trigger.id }} minutes."
+mode: queued

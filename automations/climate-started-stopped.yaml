@@ -1,0 +1,51 @@
+# Car: climate started or stopped
+#
+# Tells you when the car's remote climate starts or stops: heat, cool or
+# windscreen, whether started from Home Assistant, the car's own climate
+# timer or Mitsubishi's app. Android tip: to have the phone read it out,
+# send message: TTS with data: {tts_text: "{{ message }}"} instead.
+#
+# Change the lines marked REPLACE. README.md in this folder explains how
+# to add it to Home Assistant and what to fill in.
+
+alias: "Car: climate started or stopped"
+description: Tells you when the car's remote climate starts or stops.
+triggers:
+  - trigger: state
+    entity_id: select.phev_YOUR_VIN_phev_climate_state  # REPLACE: Phev climate state
+    not_from: [unknown, unavailable]
+    not_to: [unknown, unavailable]
+    for:
+      seconds: 5  # skips a brief flicker as a new mode starts
+variables:
+  notify_phones:
+    - notify.mobile_app_YOUR_PHONE  # REPLACE: one line per phone
+  announce_on: []  # optional: [assist_satellite.YOUR_SPEAKER]
+  message: >-
+    {{ {'off': "The car's climate has stopped.",
+        'heat': 'The car is heating.',
+        'cool': 'The car is cooling.',
+        'windscreen': 'The car is heating the windscreen.'}
+       .get(trigger.to_state.state, 'The car climate is ' ~ trigger.to_state.state ~ '.') }}
+actions:
+  - if:
+      - condition: template
+        value_template: "{{ announce_on | count > 0 }}"
+    then:
+      - action: assist_satellite.announce
+        continue_on_error: true
+        target:
+          entity_id: "{{ announce_on }}"
+        data:
+          message: "{{ message }}"
+  - repeat:
+      for_each: "{{ notify_phones }}"
+      sequence:
+        - action: "{{ repeat.item }}"
+          continue_on_error: true
+          data:
+            title: Car climate
+            message: "{{ message }}"
+            data:
+              tag: car-climate
+mode: queued

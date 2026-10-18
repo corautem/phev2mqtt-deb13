@@ -1,0 +1,33 @@
+# Car: a command didn't work
+#
+# Tells you when the car refused a command or didn't start the climate, with
+# the reason. Needs EXTRA_COMMANDS=true or CLIMATE_GUARD=true (guide Section
+# 20), which report each result in Phev Last Command Result. Useful with
+# windscreen-by-voice.yaml, which can't see whether the car started the
+# climate.
+#
+# Change the lines marked REPLACE. README.md in this folder explains how
+# to add it to Home Assistant and what to fill in.
+
+alias: "Car: a command didn't work"
+description: Tells you when the car refused a command or didn't start the climate.
+triggers:
+  - trigger: state
+    entity_id: sensor.phev_YOUR_VIN_phev_last_command_result  # REPLACE: Phev Last Command Result
+conditions:
+  - condition: template
+    value_template: >-
+      {{ trigger.to_state.state is search(': refused|: failed|did not start') }}
+variables:
+  notify_phones:
+    - notify.mobile_app_YOUR_PHONE  # REPLACE: one line per phone
+actions:
+  - repeat:
+      for_each: "{{ notify_phones }}"
+      sequence:
+        - action: "{{ repeat.item }}"
+          continue_on_error: true
+          data:
+            title: The car didn't take it
+            message: "{{ trigger.to_state.state[17:] }}"  # without the date and time
+mode: queued

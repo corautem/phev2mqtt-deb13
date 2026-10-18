@@ -1,0 +1,83 @@
+# Car: remind me to lock it
+#
+# Reminds you when the car has been unlocked for 15 minutes, every 15
+# minutes up to 4 times, and clears the phone notification once it's locked.
+#
+# Change the lines marked REPLACE. README.md in this folder explains how
+# to add it to Home Assistant and what to fill in.
+
+alias: "Car: remind me to lock it"
+description: Reminds you when the car has been left unlocked, until it's locked.
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.phev_YOUR_VIN_phev_locked  # REPLACE: Phev Locked
+    to: "on"  # lock sensors are "on" while the car is UNLOCKED
+    for:
+      minutes: 15  # before the first reminder
+conditions: []
+variables:
+  notify_phones:
+    - notify.mobile_app_YOUR_PHONE  # REPLACE: one line per phone
+  announce_on: []  # optional: [assist_satellite.YOUR_SPEAKER]
+  repeat_every: 15  # minutes between reminders
+  max_reminders: 4
+  lock: "{{ trigger.entity_id }}"
+actions:
+  - repeat:
+      sequence:
+        - variables:
+            minutes_unlocked: >-
+              {{ ((now() - trigger.to_state.last_changed).total_seconds() / 60)
+              | round(0) | int }}
+            message: >-
+              {% if repeat.first %}The car has been unlocked for
+              {{ minutes_unlocked }} minutes. Don't forget to lock it.{% else %}The
+              car is still unlocked. It's been {{ minutes_unlocked }} minutes
+              now.{% endif %}
+        - alias: Announce it on the speakers
+          if:
+            - condition: template
+              value_template: "{{ announce_on | count > 0 }}"
+          then:
+            - action: assist_satellite.announce
+              continue_on_error: true
+              target:
+                entity_id: "{{ announce_on }}"
+              data:
+                message: "{{ message }}"
+        - alias: Send it to each phone
+          repeat:
+            for_each: "{{ notify_phones }}"
+            sequence:
+              - action: "{{ repeat.item }}"
+                continue_on_error: true
+                data:
+                  title: Car unlocked
+                  message: "{{ message }}"
+                  data:
+                    tag: car-unlocked  # each reminder replaces the last
+                    priority: high  # Android: deliver straight away
+                    ttl: 0
+        - alias: Give it a while to get locked before reminding again
+          wait_template: "{{ not is_state(lock, 'on') }}"
+          timeout:
+            minutes: "{{ repeat_every }}"
+          continue_on_timeout: true
+      until:
+        - condition: template
+          value_template: "{{ not is_state(lock, 'on') or repeat.index >= max_reminders }}"
+  - alias: Once it's locked (or out of range), clear the phone notification
+    wait_template: "{{ not is_state(lock, 'on') }}"
+    timeout: "12:00:00"
+    continue_on_timeout: false
+  - repeat:
+      for_each: "{{ notify_phones }}"
+      sequence:
+        - action: "{{ repeat.item }}"
+          continue_on_error: true
+          data:
+            message: clear_notification
+            data:
+              tag: car-unlocked
+mode: single
+max_exceeded: silent

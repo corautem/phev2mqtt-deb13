@@ -1,0 +1,36 @@
+# Car: light shows while charging
+#
+# A light turns green while the car charges and off when it stops, checked
+# again whenever Home Assistant starts. The same pattern works for the
+# windscreen: use the Phev windscreen switch instead of Phev Charging. With
+# a WLED strip, select one of its presets instead (select.select_option on
+# its preset entity), each lighting its own segment, so one strip can show
+# charging and windscreen heating at the same time.
+#
+# Change the lines marked REPLACE. README.md in this folder explains how
+# to add it to Home Assistant and what to fill in.
+
+alias: "Car: light shows while charging"
+description: A light turns green while the car charges.
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.phev_YOUR_VIN_phev_charging  # REPLACE: Phev Charging
+  - trigger: homeassistant
+    event: start
+actions:
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: binary_sensor.phev_YOUR_VIN_phev_charging  # REPLACE: the same entity
+            state: "on"
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: light.YOUR_LIGHT  # REPLACE
+            data:
+              color_name: green
+    default:
+      - action: light.turn_off
+        target:
+          entity_id: light.YOUR_LIGHT  # REPLACE: the same light
+mode: single

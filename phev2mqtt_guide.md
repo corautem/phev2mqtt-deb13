@@ -52,7 +52,7 @@ Before starting, make sure you have:
 Skip this if you're migrating from a Raspberry Pi: keep using the broker and credentials you have.
 
 1. **Install the broker:** in Home Assistant, go to **Settings → Apps** (called **Add-ons** before Home Assistant 2026.2), open the store, find **Mosquitto broker** and install it. Switch on **Start on boot** and **Watchdog**, then press **Start**.
-2. **Create a login for phev2mqtt:** go to **Settings → People → Users** and add a user, for example `phev2mqtt`, with a strong password. It doesn't need to be an administrator. The **Users** tab only shows with **Advanced mode** on, in your user profile. The broker accepts Home Assistant users, so this username and password are `YOUR_MQTT_USER` and `YOUR_MQTT_PASS` from Section 9 on. Don't call it `homeassistant` or `addons`: the broker keeps those names for itself.
+2. **Create a login for phev2mqtt:** go to **Settings → People → Users** and add a user, for example `phev2mqtt`, with a strong password. It doesn't need to be an administrator. (Before Home Assistant 2026.8, the **Users** tab only shows with **Advanced mode** on, in your user profile.) The broker accepts Home Assistant users, so this username and password are `YOUR_MQTT_USER` and `YOUR_MQTT_PASS` from Section 9 on. Don't call it `homeassistant` or `addons`: the broker keeps those names for itself.
 3. **Connect Home Assistant to the broker:** **Settings → Devices & Services** shows **MQTT** as discovered. Press **Add** and confirm. phev2mqtt's entities come in through this integration ([Section 13](#13-home-assistant-integration)).
 
 The broker listens on port 1883 at Home Assistant's IP address, `HA_IP_ADDRESS` in this guide. [Section 9](#test-mqtt-connection) tests the login from the VM.
@@ -1023,7 +1023,7 @@ mqtt:
       device: *phev_gateway
 ```
 
-> **Already have these entities from an earlier version of this guide?** Replace your old `mqtt:` entries with these, then reload them (**Developer tools → YAML → Manually configured MQTT entities**) or restart Home Assistant. The entities keep their entity IDs, so dashboards and automations keep working. They move onto the PHEV Gateway device, and their names get the "PHEV Gateway" prefix unless you renamed them yourself. To put the new device in an area, open it and press the pencil icon.
+> **Already have these entities from an earlier version of this guide?** Replace your old `mqtt:` entries with these, then reload them (**Settings → Tools → YAML → Manually configured MQTT entities**; Tools was called Developer tools before Home Assistant 2026.8) or restart Home Assistant. The entities keep their entity IDs, so dashboards and automations keep working. They move onto the PHEV Gateway device, and their names get the "PHEV Gateway" prefix unless you renamed them yourself. To put the new device in an area, open it and press the pencil icon.
 
 Keep the uptime out of Home Assistant's history and logbook as well. It changes every minute, which adds about 1,500 rows a day to the database and makes its history slow to open, and restarts already show in Service State. Add this to `configuration.yaml`, or add the entity to the `exclude` list of your existing `recorder:` section, then restart Home Assistant:
 
@@ -1034,11 +1034,11 @@ recorder:
       - sensor.phev_service_uptime_friendly
 ```
 
-To clear the history it has already saved, run **Developer tools → Actions → Recorder: Purge entities** with that entity.
+To clear the history it has already saved, run **Settings → Tools → Actions → Recorder: Purge entities** with that entity.
 
 > **Upgrading from an earlier version of this guide?** It had two uptime sensors: "PHEV Service Uptime" in seconds, and "PHEV Service Uptime Friendly", a template sensor in `templates.yaml`. Now there's one, the MQTT sensor above, so it can sit on the PHEV Gateway device: a template sensor written in YAML can't belong to a device. Swap them over in this order, so it keeps the entity ID your dashboard uses:
 >
-> 1. Delete the friendly uptime's entry from `templates.yaml`, then reload **Developer tools → YAML → Template entities**.
+> 1. Delete the friendly uptime's entry from `templates.yaml`, then reload **Settings → Tools → YAML → Template entities**.
 > 2. In **Settings → Entities**, open **PHEV Service Uptime Friendly**, which now says it's no longer provided, and delete it.
 > 3. Add the MQTT entries above and reload **Manually configured MQTT entities**.
 > 4. Delete the old seconds sensor, `sensor.phev_service_uptime`, the same way as in step 2.
@@ -2063,275 +2063,13 @@ phev2mqtt then removes these entities, and the values it remembered, from Home A
 
 ## 22. Example Automations
 
-> **Optional.** Automations to copy and adapt. Each one is complete: go to **Settings → Automations & Scenes → Create automation → Create new automation**, open **⋮ → Edit in YAML**, paste it, change the parts marked `REPLACE`, and save.
+> **Optional.** The [automations](./automations/) folder has ready-made automations to copy and adapt. Its [README](./automations/README.md) explains how to add one to Home Assistant and what to fill in.
 
-**What to fill in:**
-
-- **Car entities:** their IDs contain the car's VIN, for example `binary_sensor.phev_YOUR_VIN_phev_locked`, and can look different if you renamed the device. Find yours under **Settings → Devices & Services → MQTT → PHEV &lt;VIN&gt;**: open an entity, then its cog icon. Or switch to **Edit in visual editor** after pasting and pick them from the list. [entities-outlander-phev-2014-2017.md](./entities-outlander-phev-2014-2017.md) lists them all.
-- **Phones:** with the Home Assistant Companion app, each phone has an action like `notify.mobile_app_YOUR_PHONE`. **Developer tools → Actions** lists them when you type "notify".
-- **Speakers (optional):** Assist speakers such as Home Assistant Voice are `assist_satellite.…` entities. Leave `announce_on: []` empty to skip them.
-
-The car only reports while it's in WiFi range of the VM, so its entities go unavailable when you drive away. These automations treat unavailable as "nothing to report".
-
-### Remind me to lock the car
-
-Reminds you when the car has been unlocked for 15 minutes, every 15 minutes up to 4 times, and clears the phone notification once it's locked.
-
-```yaml
-alias: "Car: remind me to lock it"
-description: Reminds you when the car has been left unlocked, until it's locked.
-triggers:
-  - trigger: state
-    entity_id: binary_sensor.phev_YOUR_VIN_phev_locked  # REPLACE: Phev Locked
-    to: "on"  # lock sensors are "on" while the car is UNLOCKED
-    for:
-      minutes: 15  # before the first reminder
-conditions: []
-variables:
-  notify_phones:
-    - notify.mobile_app_YOUR_PHONE  # REPLACE: one line per phone
-  announce_on: []  # optional: [assist_satellite.YOUR_SPEAKER]
-  repeat_every: 15  # minutes between reminders
-  max_reminders: 4
-  lock: "{{ trigger.entity_id }}"
-actions:
-  - repeat:
-      sequence:
-        - variables:
-            minutes_unlocked: >-
-              {{ ((now() - trigger.to_state.last_changed).total_seconds() / 60)
-              | round(0) | int }}
-            message: >-
-              {% if repeat.first %}The car has been unlocked for
-              {{ minutes_unlocked }} minutes. Don't forget to lock it.{% else %}The
-              car is still unlocked. It's been {{ minutes_unlocked }} minutes
-              now.{% endif %}
-        - alias: Announce it on the speakers
-          if:
-            - condition: template
-              value_template: "{{ announce_on | count > 0 }}"
-          then:
-            - action: assist_satellite.announce
-              continue_on_error: true
-              target:
-                entity_id: "{{ announce_on }}"
-              data:
-                message: "{{ message }}"
-        - alias: Send it to each phone
-          repeat:
-            for_each: "{{ notify_phones }}"
-            sequence:
-              - action: "{{ repeat.item }}"
-                continue_on_error: true
-                data:
-                  title: Car unlocked
-                  message: "{{ message }}"
-                  data:
-                    tag: car-unlocked  # each reminder replaces the last
-                    priority: high  # Android: deliver straight away
-                    ttl: 0
-        - alias: Give it a while to get locked before reminding again
-          wait_template: "{{ not is_state(lock, 'on') }}"
-          timeout:
-            minutes: "{{ repeat_every }}"
-          continue_on_timeout: true
-      until:
-        - condition: template
-          value_template: "{{ not is_state(lock, 'on') or repeat.index >= max_reminders }}"
-  - alias: Once it's locked (or out of range), clear the phone notification
-    wait_template: "{{ not is_state(lock, 'on') }}"
-    timeout: "12:00:00"
-    continue_on_timeout: false
-  - repeat:
-      for_each: "{{ notify_phones }}"
-      sequence:
-        - action: "{{ repeat.item }}"
-          continue_on_error: true
-          data:
-            message: clear_notification
-            data:
-              tag: car-unlocked
-mode: single
-max_exceeded: silent
-```
-
-### Tell me when the climate starts or stops
-
-Works for heat, cool and windscreen, whether started from Home Assistant, the car's own climate timer or Mitsubishi's app.
-
-```yaml
-alias: "Car: climate started or stopped"
-description: Tells you when the car's remote climate starts or stops.
-triggers:
-  - trigger: state
-    entity_id: select.phev_YOUR_VIN_phev_climate_state  # REPLACE: Phev climate state
-    not_from: [unknown, unavailable]
-    not_to: [unknown, unavailable]
-    for:
-      seconds: 5  # skips a brief flicker as a new mode starts
-variables:
-  notify_phones:
-    - notify.mobile_app_YOUR_PHONE  # REPLACE: one line per phone
-  announce_on: []  # optional: [assist_satellite.YOUR_SPEAKER]
-  message: >-
-    {{ {'off': "The car's climate has stopped.",
-        'heat': 'The car is heating.',
-        'cool': 'The car is cooling.',
-        'windscreen': 'The car is heating the windscreen.'}
-       .get(trigger.to_state.state, 'The car climate is ' ~ trigger.to_state.state ~ '.') }}
-actions:
-  - if:
-      - condition: template
-        value_template: "{{ announce_on | count > 0 }}"
-    then:
-      - action: assist_satellite.announce
-        continue_on_error: true
-        target:
-          entity_id: "{{ announce_on }}"
-        data:
-          message: "{{ message }}"
-  - repeat:
-      for_each: "{{ notify_phones }}"
-      sequence:
-        - action: "{{ repeat.item }}"
-          continue_on_error: true
-          data:
-            title: Car climate
-            message: "{{ message }}"
-            data:
-              tag: car-climate
-mode: queued
-```
-
-> **Android tip:** to have the phone read it out, send `message: TTS` with `data: {tts_text: "{{ message }}"}` instead.
-
-### Tell me when the car didn't take a command
-
-Needs `EXTRA_COMMANDS=true` or `CLIMATE_GUARD=true` ([Section 20](#20-optional-extra-sensors)), which report each result in **Phev Last Command Result**. Useful with the voice automation below, which can't see whether the car started the climate.
-
-```yaml
-alias: "Car: a command didn't work"
-description: Tells you when the car refused a command or didn't start the climate.
-triggers:
-  - trigger: state
-    entity_id: sensor.phev_YOUR_VIN_phev_last_command_result  # REPLACE: Phev Last Command Result
-conditions:
-  - condition: template
-    value_template: >-
-      {{ trigger.to_state.state is search(': refused|: failed|did not start') }}
-variables:
-  notify_phones:
-    - notify.mobile_app_YOUR_PHONE  # REPLACE: one line per phone
-actions:
-  - repeat:
-      for_each: "{{ notify_phones }}"
-      sequence:
-        - action: "{{ repeat.item }}"
-          continue_on_error: true
-          data:
-            title: The car didn't take it
-            message: "{{ trigger.to_state.state[17:] }}"  # without the date and time
-mode: queued
-```
-
-### Heat the windscreen by voice
-
-Ask Assist "heat the windscreen for 20 minutes": 10, 20 or 30 minutes. Speech recognition sometimes hears "heat" as "hit", so both are listed. It sends the command straight to phev2mqtt, as the Phev windscreen switch does, but with the duration you asked for. For heating or cooling, use `phev/set/climate/heat` or `phev/set/climate/cool`.
-
-```yaml
-alias: "Car: heat the windscreen by voice"
-description: Ask Assist to heat the windscreen for 10, 20 or 30 minutes.
-triggers:
-  - trigger: conversation
-    command:
-      - "(heat|hit|warm up|defrost|preheat) the [car] windscreen for 10 minutes"
-      - "(heat|hit) the car for 10 minutes"
-    id: "10"
-  - trigger: conversation
-    command:
-      - "(heat|hit|warm up|defrost|preheat) the [car] windscreen for 20 minutes"
-      - "(heat|hit) the car for 20 minutes"
-    id: "20"
-  - trigger: conversation
-    command:
-      - "(heat|hit|warm up|defrost|preheat) the [car] windscreen for 30 minutes"
-      - "(heat|hit) the car for 30 minutes"
-    id: "30"
-actions:
-  - action: mqtt.publish
-    data:
-      topic: phev/set/climate/windscreen
-      payload: "{{ trigger.id }}"
-  - set_conversation_response: "Heating the windscreen for {{ trigger.id }} minutes."
-mode: queued
-```
-
-### A light shows while the car charges
-
-A light turns green while the car charges and off when it stops, checked again whenever Home Assistant starts. The same pattern works for the windscreen: use the **Phev windscreen** switch instead of **Phev Charging**.
-
-```yaml
-alias: "Car: light shows while charging"
-description: A light turns green while the car charges.
-triggers:
-  - trigger: state
-    entity_id: binary_sensor.phev_YOUR_VIN_phev_charging  # REPLACE: Phev Charging
-  - trigger: homeassistant
-    event: start
-actions:
-  - choose:
-      - conditions:
-          - condition: state
-            entity_id: binary_sensor.phev_YOUR_VIN_phev_charging  # REPLACE: the same entity
-            state: "on"
-        sequence:
-          - action: light.turn_on
-            target:
-              entity_id: light.YOUR_LIGHT  # REPLACE
-            data:
-              color_name: green
-    default:
-      - action: light.turn_off
-        target:
-          entity_id: light.YOUR_LIGHT  # REPLACE: the same light
-mode: single
-```
-
-> **With a WLED strip**, select one of its presets instead (`select.select_option` on its preset entity), each lighting its own segment. One strip can then show charging and windscreen heating at the same time.
-
-### Tell me when the gateway needs attention
-
-Uses the gateway's own entities from [Section 14](#14-wifi-status-scripts-and-mqtt-sensors) and [Section 19](#19-self-healing-watchdog). It tells you when phev2mqtt has not been running for 10 minutes, including when the whole VM is off (Service State then goes unavailable), or when the watchdog couldn't fix the WiFi link by itself.
-
-```yaml
-alias: "Car: the PHEV gateway needs attention"
-description: Tells you when phev2mqtt has stopped or the watchdog needs help.
-triggers:
-  - trigger: state
-    entity_id: sensor.phev_service_state
-    not_to: active
-    for:
-      minutes: 10
-    id: service
-  - trigger: state
-    entity_id: sensor.phev_watchdog_last_action
-    to: stuck_needs_attention
-    id: watchdog
-variables:
-  notify_phones:
-    - notify.mobile_app_YOUR_PHONE  # REPLACE: one line per phone
-actions:
-  - repeat:
-      for_each: "{{ notify_phones }}"
-      sequence:
-        - action: "{{ repeat.item }}"
-          continue_on_error: true
-          data:
-            title: PHEV gateway
-            message: >-
-              {% if trigger.id == 'service' %}phev2mqtt has not been running on
-              the VM for 10 minutes (it's {{ trigger.to_state.state }}).
-              {%- else %}The watchdog couldn't bring the car's WiFi link back by
-              itself. Check the VM.{% endif %}
-mode: single
-```
+| Automation | What it does |
+|---|---|
+| [lock-reminder.yaml](./automations/lock-reminder.yaml) | Reminds you when the car has been left unlocked, until it's locked |
+| [climate-started-stopped.yaml](./automations/climate-started-stopped.yaml) | Tells you when the climate starts or stops, in any mode |
+| [command-didnt-work.yaml](./automations/command-didnt-work.yaml) | Tells you when the car refused a command or didn't start the climate, with the reason |
+| [windscreen-by-voice.yaml](./automations/windscreen-by-voice.yaml) | Heats the windscreen for 10, 20 or 30 minutes when you ask Assist |
+| [charging-light.yaml](./automations/charging-light.yaml) | A light turns green while the car charges |
+| [gateway-needs-attention.yaml](./automations/gateway-needs-attention.yaml) | Tells you when phev2mqtt stops or the watchdog needs help |

@@ -1,0 +1,40 @@
+# Car: the PHEV gateway needs attention
+#
+# Tells you when phev2mqtt has not been running for 10 minutes, including
+# when the whole VM is off (Service State then goes unavailable), or when
+# the watchdog couldn't fix the WiFi link by itself. Uses the gateway's own
+# entities from guide Sections 14 and 19.
+#
+# Change the lines marked REPLACE. README.md in this folder explains how
+# to add it to Home Assistant and what to fill in.
+
+alias: "Car: the PHEV gateway needs attention"
+description: Tells you when phev2mqtt has stopped or the watchdog needs help.
+triggers:
+  - trigger: state
+    entity_id: sensor.phev_service_state
+    not_to: active
+    for:
+      minutes: 10
+    id: service
+  - trigger: state
+    entity_id: sensor.phev_watchdog_last_action
+    to: stuck_needs_attention
+    id: watchdog
+variables:
+  notify_phones:
+    - notify.mobile_app_YOUR_PHONE  # REPLACE: one line per phone
+actions:
+  - repeat:
+      for_each: "{{ notify_phones }}"
+      sequence:
+        - action: "{{ repeat.item }}"
+          continue_on_error: true
+          data:
+            title: PHEV gateway
+            message: >-
+              {% if trigger.id == 'service' %}phev2mqtt has not been running on
+              the VM for 10 minutes (it's {{ trigger.to_state.state }}).
+              {%- else %}The watchdog couldn't bring the car's WiFi link back by
+              itself. Check the VM.{% endif %}
+mode: single
