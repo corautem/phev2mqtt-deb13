@@ -1864,7 +1864,7 @@ phev2mqtt then removes these entities from Home Assistant. A rollback ([Section 
 | Phev Flash Lights | Headlights on for 5 seconds, to find the car; refused while the headlights are on |
 | Phev Sync Car Clock | Sets the car's clock from the VM's (set the VM's timezone first, Section 3) |
 | Phev Charge Now | Suspends the car's own charge timer, so it charges now |
-| Phev Resume Car Charge Timer | Lets the car's own charge timer decide again |
+| Phev Resume Car Charge Timer | Lets the car's own charge timer decide again; refused when the car has no charge timer programmed, as a timer with no charge window could stop it charging |
 
 **Phev Last Command Result** (Diagnostic) shows how each went, for example `Flash Lights: done`, or why the car didn't take it.
 
