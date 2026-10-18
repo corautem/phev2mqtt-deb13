@@ -70,7 +70,7 @@ With `VEHICLE_SETTINGS=read`, the vehicle settings below also appear here, as re
 
 ## Vehicle settings (Configuration)
 
-With `VEHICLE_SETTINGS=write`, each setting the car reports is a drop-down in the **Configuration** section, named after its group, for example **Phev Lights: Headlights ON when exiting Vehicle**. The car offers only some of the options Mitsubishi's catalogue has; these are the 29 settings and the options the UK car offered. Other trim levels can differ.
+With `VEHICLE_SETTINGS=write`, each setting the car reports is a drop-down in the **Configuration** section, named after its group, for example **Phev Lights: Headlights ON when exiting Vehicle**. The car offers only some of the options Mitsubishi's catalogue has; these are the 29 settings and the options the UK car offered. Other trim levels can differ. The names and options are as Mitsubishi's app shows them, from phev2mqtt's settings catalogue, which is adapted from PHEV Link ([Credits](./README.md#credits)).
 
 **Keyless entry & operation**
 
@@ -157,6 +157,6 @@ The theft-alarm settings are never shown, as in Mitsubishi's own app.
 
 ## Model notes
 
-- **Power switch on**: the car turns its Wi-Fi off shortly after the power switch goes to ON (about 40 seconds in a 2014 car's log from [phev-remote-plus](https://github.com/Anwo91/phev-remote-plus); ACC is fine), so values stop updating while driving and come back once the car is switched off.
+- **Power switch on**: the car turns its Wi-Fi off shortly after the power switch goes to ON (about 40 seconds in a 2014 car's log from [PHEV Link](https://github.com/Anwo91/phev-remote-plus) (phev-remote-plus); ACC is fine), so values stop updating while driving and come back once the car is switched off.
 - **Deadlock with one press**: if "The Number of Lock Button Pushes for Dead Lock" is set to 1 time, locking with the remote flashes the indicators three times for the deadlock, whatever "Turn Signal Lights Answerback" says.
 - **Values after a restart**: the car sends most values only when they change. phev2mqtt sends the last known values again after Home Assistant restarts.

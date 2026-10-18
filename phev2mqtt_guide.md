@@ -1821,7 +1821,7 @@ During normal operation you should see nothing alarming — the script runs sile
 
 > **Optional.** Needs a [corautem/phev2mqtt](https://github.com/corautem/phev2mqtt) build from October 2026 or later, installed with [Section 16](#16-how-to-update-and-roll-back-phev2mqtt) so you can roll back.
 
-phev2mqtt can publish 14 more Home Assistant entities, decoded from data the car already sends, so the car sees no extra traffic. They are off by default. The decoding is ported from [phev-remote-plus](https://github.com/Anwo91/phev-remote-plus), which checked it against a 2014 car.
+phev2mqtt can publish 14 more Home Assistant entities, decoded from data the car already sends, so the car sees no extra traffic. They are off by default. The decoding is adapted from [PHEV Link](https://github.com/Anwo91/phev-remote-plus) (phev-remote-plus) by Anwo91, from a version released under the GPL version 3 or later ([Credits](./README.md#credits)), which checked it against a 2014 car.
 
 | Entity | What it shows |
 |---|---|
@@ -1933,7 +1933,7 @@ journalctl -u phev2mqtt -o cat | grep -E 'KEY_RESYNC|REKEY|SETREG_RETRY|too many
 
 > **Optional.** Needs a [corautem/phev2mqtt](https://github.com/corautem/phev2mqtt) build from October 2026 or later, installed with [Section 16](#16-how-to-update-and-roll-back-phev2mqtt).
 
-The car's own customisable functions, the ones Mitsubishi's app lists under "Vehicle settings", can be shown and changed in Home Assistant: lights, locks and unlock mode, lock beeps and horn answerback, wipers, turn signals, power windows and A/C behaviour. The car reports them itself; which ones appear depends on how your car is equipped. The decoding is ported from [phev-remote-plus](https://github.com/Anwo91/phev-remote-plus), which worked it out from Mitsubishi's app.
+The car's own customisable functions, the ones Mitsubishi's app lists under "Vehicle settings", can be shown and changed in Home Assistant: lights, locks and unlock mode, lock beeps and horn answerback, wipers, turn signals, power windows and A/C behaviour. The car reports them itself; which ones appear depends on how your car is equipped. The decoding and the setting names are adapted from [PHEV Link](https://github.com/Anwo91/phev-remote-plus) (phev-remote-plus) by Anwo91, from a version released under the GPL version 3 or later ([Credits](./README.md#credits)), which worked them out from Mitsubishi's app.
 
 `VEHICLE_SETTINGS` has three values:
 

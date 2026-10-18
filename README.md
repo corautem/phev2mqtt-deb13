@@ -45,7 +45,7 @@ A complete guide for running [phev2mqtt](https://github.com/buxtronix/phev2mqtt)
 ## Credits
 
 - [buxtronix/phev2mqtt](https://github.com/buxtronix/phev2mqtt) — the original project this guide is based on
-- [Anwo91/phev-remote-plus](https://github.com/Anwo91/phev-remote-plus) — register decoding behind the optional extra sensors
+- [PHEV Link](https://github.com/Anwo91/phev-remote-plus) (phev-remote-plus) by Anwo91 — the register decoding, vehicle settings, commands and key resync behind the optional features of [corautem/phev2mqtt](https://github.com/corautem/phev2mqtt). They were adapted from PHEV Link's source as published on 14 October 2026, before version 1.0.92, when it was licensed under the GNU General Public License version 3 or later; the fork is under the same licence. PHEV Link has been proprietary since 15 October 2026, and nothing from its later versions is used. The fork's [Credits](https://github.com/corautem/phev2mqtt#credits) list exactly what was used. This repository holds no PHEV Link code; the vehicle setting names in [entities-outlander-phev-2014-2017.md](./entities-outlander-phev-2014-2017.md) are Mitsubishi's, as its app shows them.
 - [RinCat/RTL88x2BU-Linux-Driver](https://github.com/RinCat/RTL88x2BU-Linux-Driver) — WiFi driver used in this guide
 - [Claude by Anthropic](https://claude.ai) — assisted in writing and structuring this guide
 
